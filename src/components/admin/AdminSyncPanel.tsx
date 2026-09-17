@@ -1,9 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import { clsx } from "clsx";
-import { RefreshCw } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import type { SyncLogRow } from "@/lib/types/database";
@@ -15,6 +13,8 @@ const SOURCE_LABELS: Record<string, string> = {
   manual: "Mock / Manual data",
 };
 
+const ACTIONS_URL = "https://github.com/DFA-cwellborne/dfa-dashboard/actions/workflows/sync.yml";
+
 export function AdminSyncPanel({
   bySource,
   recent,
@@ -22,61 +22,25 @@ export function AdminSyncPanel({
   bySource: Record<string, SyncLogRow | undefined>;
   recent: SyncLogRow[];
 }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [triggerError, setTriggerError] = useState<string | null>(null);
-  const [lastTriggerMessage, setLastTriggerMessage] = useState<string | null>(null);
-
-  async function handleSyncNow() {
-    setTriggerError(null);
-    setLastTriggerMessage(null);
-    try {
-      const res = await fetch("/api/sync", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok && res.status !== 207) {
-        setTriggerError(json.error ?? "Sync failed.");
-      } else {
-        const failed = (json.results ?? []).filter((r: { success: boolean }) => !r.success);
-        setLastTriggerMessage(
-          failed.length ? `Completed with ${failed.length} source error(s).` : "Sync completed successfully."
-        );
-      }
-    } catch (e) {
-      setTriggerError(e instanceof Error ? e.message : String(e));
-    } finally {
-      startTransition(() => router.refresh());
-    }
-  }
-
   const sources = Object.keys(SOURCE_LABELS);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-navy/60">
-          Manually trigger a sync across all configured sources, or wait for the scheduled job
-          (<code className="rounded bg-navy/10 px-1">/api/cron/sync</code>).
+          Chapters sync automatically every 20 minutes via a GitHub Actions workflow — this page
+          just displays the results, it never talks to Sheets/Airtable directly.
         </p>
-        <button
-          onClick={handleSyncNow}
-          disabled={isPending}
-          className="flex items-center gap-2 rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+        <a
+          href={ACTIONS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="flex shrink-0 items-center gap-2 rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
-          <RefreshCw size={16} className={isPending ? "animate-spin" : ""} />
-          {isPending ? "Syncing…" : "Sync now"}
-        </button>
+          <ExternalLink size={16} />
+          Run sync now on GitHub
+        </a>
       </div>
-
-      {triggerError && (
-        <div className="rounded-lg border border-red/30 bg-red/5 px-4 py-3 text-sm text-red">
-          {triggerError}
-        </div>
-      )}
-      {lastTriggerMessage && !triggerError && (
-        <div className="rounded-lg border border-[#0ca30c]/30 bg-[#0ca30c]/5 px-4 py-3 text-sm text-[#0ca30c]">
-          {lastTriggerMessage}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {sources.map((source) => {
@@ -152,7 +116,7 @@ export function AdminSyncPanel({
               {recent.length === 0 && (
                 <tr>
                   <td colSpan={5} className="py-6 text-center text-navy/40">
-                    No sync runs yet — click &quot;Sync now&quot; to run one.
+                    No sync runs yet — wait for the scheduled job or trigger it manually on GitHub.
                   </td>
                 </tr>
               )}

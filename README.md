@@ -28,24 +28,44 @@ different, and the sync layer reflects that:
 
 ## Architecture
 
+This is a **static export hosted on GitHub Pages** — there's no Node server in
+production, so the two jobs that used to be "the backend" are now two GitHub
+Actions workflows in `.github/workflows/`:
+
 ```
-Google Sheets (Home tab)  ─┐
-Airtable (signups, events) ┼─> sync adapters (src/lib/sync/*) ─> Supabase
-                            │                                       │
-                            │                                       ├─> single overview page (src/app/page.tsx)
-                            │                                       └─> realtime subscriptions (live sync-status dot)
+Google Sheets (Home + Master List) ─┐
+Airtable (signups, events)          ┼─> sync.yml (cron, every 20 min) ─> Supabase
+                                     │        runs scripts/run-sync.ts
+                                     │
+                                     └─> deploy.yml (on push to main)
+                                              `next build` (output: "export") ─> GitHub Pages
+
+Browser ── loads static HTML/JS from Pages ── fetches Supabase directly (anon key) ── renders
 ```
 
-The dashboard **never** queries Google Sheets/Airtable directly on page load —
-the single overview page reads only from Supabase, populated by:
-- The **"Sync now" button** in the on-page Admin/Sync section (`POST /api/sync`)
-- A scheduled job hitting `GET /api/cron/sync` (see below)
+The dashboard **never** queries Google Sheets/Airtable directly — only the
+`sync` workflow does that, server-side, using the Supabase service-role key
+(kept as a GitHub Actions secret, never shipped to the browser). The deployed
+page itself reads Supabase straight from the browser using the public anon
+key, which is safe because reads are gated by the RLS policies in
+`supabase/migrations/0001_init.sql` — see `src/components/dashboard/Overview.tsx`.
 
 Everything lives on one page: hero stats, chapter/RSO status, trend charts,
 the signups date-range chart, program-health metrics, the chapters table, and
-the admin/sync panel are all sections of `src/app/page.tsx`.
+the admin/sync panel are all sections of `src/components/dashboard/Overview.tsx`.
+
+**Important:** `src/config/env.ts` (server secrets, via dynamic `process.env[name]`
+lookups) and `src/lib/supabase/server.ts` (the service-role client) must never
+be imported — even transitively — by a client component. Next's bundler
+inlines the *entire* referenced env value once a dynamic lookup like that is
+reachable from client code, not just `NEXT_PUBLIC_*` ones (this leaked the
+service-role key into the exported JS once, during development — caught by
+grepping the built `out/` bundle before it was ever deployed). Client code
+must only import from `src/config/publicEnv.ts` instead.
 
 ## Setup
+
+### Local development
 
 1. `.env.local` already has your real Supabase project, Google Sheet ID,
    Airtable, and Breakthru credentials filled in.
@@ -54,16 +74,29 @@ the admin/sync panel are all sections of `src/app/page.tsx`.
    editor (Project → SQL Editor → New query) and run it, then do the same
    with `0002_remove_unused_chapter_fields.sql`. Don't paste the file
    *path*, paste the file's *contents*.
-3. **Still needed before Sheets sync will work**: the sheet is already set
-   to "anyone with the link can view," so create a plain Google API key
-   (console.cloud.google.com → APIs & Services → enable "Google Sheets API"
-   → Credentials → Create API Key) and set `GOOGLE_SHEETS_API_KEY` in
-   `.env.local`.
-4. `npm run dev`, scroll to the Admin/Sync section, click **Sync now**.
-5. To test against generated sample data instead of real credentials at any
-   point, set `USE_MOCK_DATA=true` — `src/lib/sync/mockAdapter.ts` mirrors
-   the real Sheets/Airtable shapes (including mixed-case school names, to
-   exercise the same matching logic).
+3. `npm run dev`, then `npm run sync:run` in another terminal to pull real
+   data in (or `npm run seed:mock` to test with generated sample data first —
+   `src/lib/sync/mockAdapter.ts` mirrors the real shapes, including
+   mixed-case school names, to exercise the same matching logic).
+
+### Deploying (GitHub Pages + Actions)
+
+1. **Repo secrets** — Settings → Secrets and variables → Actions → New
+   repository secret. Add every value from `.env.local`:
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_SHEETS_SPREADSHEET_ID`,
+   `GOOGLE_SHEETS_SHEET_NAME`, `GOOGLE_SHEETS_API_KEY`, `AIRTABLE_API_KEY`,
+   `AIRTABLE_SIGNUPS_BASE_ID`, `AIRTABLE_SIGNUPS_TABLE`,
+   `AIRTABLE_EVENTS_BASE_ID`, `AIRTABLE_EVENTS_TABLE`,
+   `BREAKTHRU_API_BASE_URL`, `BREAKTHRU_API_KEY`.
+2. **Pages source** — Settings → Pages → Build and deployment → Source →
+   **GitHub Actions**.
+3. Push to `main`. `deploy.yml` builds and publishes the site;
+   `sync.yml` starts running on its own 20-minute schedule. Both can also be
+   triggered manually from the repo's **Actions** tab (`workflow_dispatch`).
+4. The site is served at `https://<org>.github.io/dfa-dashboard/` — that path
+   is hardcoded as `basePath` in `next.config.ts` since GitHub Pages project
+   sites always live under `/<repo-name>/`.
 
 ### If the sheet layout changes
 
@@ -89,17 +122,15 @@ matching, add it to the relevant alias list.
 
 ### Auto-sync
 
-This already runs on its own — no cron job to set up. `src/instrumentation.ts`
-schedules a sync every `SYNC_INTERVAL_MINUTES` (default 20) as soon as the
-server starts, as long as it's run as a long-lived process (`npm run dev`,
-`npm start`, self-hosted, Docker). You'll see
-`[auto-sync] synced 2 source(s) successfully` in the server logs on each run.
+Handled entirely by `.github/workflows/sync.yml` — no server or long-lived
+process needed. It runs `npm run sync:run` (`scripts/run-sync.ts` →
+`runSync()`) every 20 minutes via a GitHub Actions `schedule` cron, using the
+repo secrets above. GitHub Actions cron jobs on public repos are free with no
+frequency limit (unlike Vercel's free tier, which caps cron at once/day).
 
-If you ever deploy to **Vercel** instead, that model doesn't apply
-(serverless functions don't stay running for a timer) — `vercel.json` already
-has a matching cron entry hitting `GET /api/cron/sync` every 20 minutes, and
-`src/instrumentation.ts` detects Vercel and skips its own scheduler so the two
-don't double up.
+Note: GitHub auto-disables scheduled workflows after 60 days with no repo
+activity — push anything, or run `sync.yml` manually once, to re-enable it if
+that ever happens.
 
 ## Build order (for reference)
 

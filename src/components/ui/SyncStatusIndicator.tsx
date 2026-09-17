@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { clsx } from "clsx";
-import { env } from "@/config/env";
+import { isSupabaseConfigured } from "@/config/publicEnv";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { SyncLogRow } from "@/lib/types/database";
 import { RelativeTime } from "./RelativeTime";
@@ -18,7 +18,7 @@ export function SyncStatusIndicator({ initialLatest }: SyncStatusIndicatorProps)
   const [latest, setLatest] = useState<SyncLogRow | null>(initialLatest);
 
   useEffect(() => {
-    if (!env.supabase.url || !env.supabase.anonKey) return;
+    if (!isSupabaseConfigured()) return;
 
     const supabase = getBrowserSupabase();
     const channel = supabase

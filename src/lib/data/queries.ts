@@ -1,5 +1,5 @@
-import { isSupabaseConfigured } from "@/config/env";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/config/publicEnv";
+import { getBrowserSupabase } from "@/lib/supabase/client";
 import type {
   ChapterEventRow,
   ChapterRow,
@@ -38,7 +38,7 @@ const EMPTY: DashboardData = {
 export async function getDashboardData(): Promise<DashboardData> {
   if (!isSupabaseConfigured()) return EMPTY;
 
-  const supabase = getServerSupabase();
+  const supabase = getBrowserSupabase();
 
   const [chaptersRes, snapshotsRes, eventsRes, signupsRes, summaryRes, syncLogRes] =
     await Promise.all([
@@ -68,7 +68,7 @@ export interface SyncLogSummary {
 
 export async function getSyncLogSummary(): Promise<SyncLogSummary> {
   if (!isSupabaseConfigured()) return { bySource: {}, recent: [] };
-  const supabase = getServerSupabase();
+  const supabase = getBrowserSupabase();
   const { data } = await supabase
     .from("sync_log")
     .select("*")
