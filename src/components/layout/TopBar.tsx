@@ -1,4 +1,5 @@
-import { Settings } from "lucide-react";
+import { clsx } from "clsx";
+import { RefreshCw, Settings } from "lucide-react";
 import { format } from "date-fns";
 import { Logo } from "@/components/layout/Logo";
 import { SyncStatusIndicator } from "@/components/ui/SyncStatusIndicator";
@@ -9,11 +10,15 @@ export function TopBar({
   subtitle,
   latestSync,
   onOpenAdmin,
+  onRefresh,
+  refreshing,
 }: {
   title: string;
   subtitle?: string;
   latestSync: SyncLogRow | null;
   onOpenAdmin?: () => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-navy/10 bg-white/70 px-6 py-4 backdrop-blur">
@@ -31,6 +36,17 @@ export function TopBar({
             : "No synced data yet"}
         </span>
         <SyncStatusIndicator initialLatest={latestSync} />
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label="Refresh data"
+            title="Refresh data"
+            className="rounded-full border border-navy/10 bg-white p-2 text-navy/50 transition-colors hover:bg-navy/5 hover:text-navy disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={clsx(refreshing && "animate-spin")} />
+          </button>
+        )}
         {onOpenAdmin && (
           <button
             onClick={onOpenAdmin}

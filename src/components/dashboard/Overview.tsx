@@ -37,9 +37,10 @@ function num(n: number | null) {
 
 // This is a static export with no server, so the dashboard reads Supabase
 // directly from the browser (anon key, RLS-gated read access) instead of via
-// server-side rendering. Refetches on an interval so new syncs (written by
-// the GitHub Actions cron) show up without a manual reload.
-const REFRESH_INTERVAL_MS = 60_000;
+// server-side rendering. Refetches on an interval (and on tab refocus, and
+// via the manual refresh button) so new syncs — written by the GitHub
+// Actions cron every 20 minutes — show up without waiting on a full reload.
+const REFRESH_INTERVAL_MS = 20_000;
 
 const METRIC_INFO = {
   activeChapters:
@@ -69,25 +70,48 @@ export function Overview() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [syncLog, setSyncLog] = useState<SyncLogSummary | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
+    async function load(showSpinner: boolean) {
+      if (showSpinner) setRefreshing(true);
       const [d, s] = await Promise.all([getDashboardData(), getSyncLogSummary()]);
       if (!cancelled) {
         setData(d);
         setSyncLog(s);
       }
+      if (showSpinner) setRefreshing(false);
     }
 
-    load();
-    const interval = setInterval(load, REFRESH_INTERVAL_MS);
+    load(false);
+    const interval = setInterval(() => load(false), REFRESH_INTERVAL_MS);
+
+    // Refetch when the tab regains focus/visibility — catches up on syncs
+    // that landed while this tab was backgrounded, without waiting for the
+    // interval.
+    function onVisible() {
+      if (document.visibilityState === "visible") load(false);
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
     };
   }, []);
+
+  async function handleManualRefresh() {
+    setRefreshing(true);
+    const [d, s] = await Promise.all([getDashboardData(), getSyncLogSummary()]);
+    setData(d);
+    setSyncLog(s);
+    setRefreshing(false);
+  }
 
   if (!data || !syncLog) {
     return (
@@ -130,6 +154,8 @@ export function Overview() {
         subtitle="Across all reporting DFA chapters"
         latestSync={data.latestSync}
         onOpenAdmin={() => setAdminOpen(true)}
+        onRefresh={handleManualRefresh}
+        refreshing={refreshing}
       />
       <main className="flex-1 space-y-8 p-6">
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

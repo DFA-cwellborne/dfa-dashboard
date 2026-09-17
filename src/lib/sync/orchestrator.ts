@@ -34,6 +34,20 @@ interface AdapterRunOutcome {
   events: ChapterEvent[];
 }
 
+/**
+ * sync_log is publicly readable (anon key, RLS-gated to SELECT only) so the
+ * dashboard can show sync history to any visitor — but that means error
+ * text stored here is also public. Google's client library (and any raw
+ * HTTP error) can embed the full request URL, including an API-key query
+ * param, in its error message. Strip anything that looks like a secret
+ * before it's ever logged or persisted.
+ */
+function redactSecrets(message: string): string {
+  return message
+    .replace(/([?&](?:key|api_key|apikey|token)=)[^&\s]+/gi, "$1[redacted]")
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]");
+}
+
 async function runAdapter(adapter: SourceAdapter): Promise<AdapterRunOutcome> {
   const startedAt = new Date().toISOString();
   const errors: string[] = [];
@@ -42,32 +56,37 @@ async function runAdapter(adapter: SourceAdapter): Promise<AdapterRunOutcome> {
   let signups: ChapterSignup[] = [];
   let events: ChapterEvent[] = [];
 
+  function reportError(label: string, e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    errors.push(`${label}: ${redactSecrets(message)}`);
+  }
+
   if (adapter.fetchChapters) {
     try {
       chapters = await adapter.fetchChapters();
     } catch (e) {
-      errors.push(`fetchChapters: ${e instanceof Error ? e.message : String(e)}`);
+      reportError("fetchChapters", e);
     }
   }
   if (adapter.fetchSummary) {
     try {
       summary = await adapter.fetchSummary();
     } catch (e) {
-      errors.push(`fetchSummary: ${e instanceof Error ? e.message : String(e)}`);
+      reportError("fetchSummary", e);
     }
   }
   if (adapter.fetchSignups) {
     try {
       signups = await adapter.fetchSignups();
     } catch (e) {
-      errors.push(`fetchSignups: ${e instanceof Error ? e.message : String(e)}`);
+      reportError("fetchSignups", e);
     }
   }
   if (adapter.fetchEvents) {
     try {
       events = await adapter.fetchEvents();
     } catch (e) {
-      errors.push(`fetchEvents: ${e instanceof Error ? e.message : String(e)}`);
+      reportError("fetchEvents", e);
     }
   }
 
@@ -101,7 +120,7 @@ async function logSyncResult(result: SyncResult) {
       errors: result.errors,
     });
   } catch (e) {
-    console.error("Failed to write sync_log:", e);
+    console.error("Failed to write sync_log:", redactSecrets(e instanceof Error ? e.message : String(e)));
   }
 }
 
@@ -253,7 +272,7 @@ export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult[
     await persistSignups(allSignups);
     await persistEvents(allEvents);
   } catch (e) {
-    persistError = e instanceof Error ? e.message : String(e);
+    persistError = redactSecrets(e instanceof Error ? e.message : String(e));
   }
 
   const results = outcomes.map((o) => {

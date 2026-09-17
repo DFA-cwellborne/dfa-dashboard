@@ -71,13 +71,18 @@ export function AdminSyncPanel({
                 <span className="text-xs text-navy/40">{log.records_processed} records processed</span>
               )}
               {log?.errors?.length ? (
-                <ul className="mt-1 space-y-1 text-xs text-red">
-                  {log.errors.slice(0, 3).map((err, i) => (
-                    <li key={i} className="line-clamp-2">
-                      {err}
-                    </li>
-                  ))}
-                </ul>
+                <details className="mt-1 text-xs text-red">
+                  <summary className="cursor-pointer select-none font-medium">
+                    {log.errors.length} error{log.errors.length === 1 ? "" : "s"}
+                  </summary>
+                  <ul className="mt-1 space-y-1">
+                    {log.errors.map((err, i) => (
+                      <li key={i} className="break-words">
+                        {err}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               ) : null}
             </Card>
           );
@@ -110,7 +115,24 @@ export function AdminSyncPanel({
                     <RelativeTime date={log.finished_at} />
                   </td>
                   <td className="py-2 pr-4 text-right text-navy/60">{log.records_processed}</td>
-                  <td className="py-2 text-navy/40">{log.errors?.slice(0, 1).join(", ") || "—"}</td>
+                  <td className="py-2 text-navy/40">
+                    {log.errors?.length ? (
+                      <details>
+                        <summary className="cursor-pointer select-none text-red">
+                          {log.errors.length} error{log.errors.length === 1 ? "" : "s"}
+                        </summary>
+                        <ul className="mt-1 max-w-md space-y-1 text-red">
+                          {log.errors.map((err, i) => (
+                            <li key={i} className="break-words">
+                              {err}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                 </tr>
               ))}
               {recent.length === 0 && (
