@@ -1,69 +1,227 @@
-import Image from "next/image";
+import { Users, Building2, CalendarCheck, TrendingUp, Clock, UserPlus } from "lucide-react";
+import { TopBar } from "@/components/layout/TopBar";
+import { StatCard } from "@/components/ui/StatCard";
+import { Card } from "@/components/ui/Card";
+import { SetupNotice } from "@/components/ui/SetupNotice";
+import { TrendLineChart } from "@/components/charts/TrendLineChart";
+import { RangeTrendChart } from "@/components/charts/RangeTrendChart";
+import { EventTypeBarChart } from "@/components/charts/EventTypeBarChart";
+import { ChaptersTable } from "@/components/chapters/ChaptersTable";
+import { AdminSyncPanel } from "@/components/admin/AdminSyncPanel";
+import { getDashboardData, getSyncLogSummary } from "@/lib/data/queries";
+import {
+  computeChapterCounts,
+  computeEventBreakdown,
+  computeMembershipStats,
+  computeRetention,
+  computeRsoBreakdown,
+  computeSignupsTrend,
+  computeStatusBreakdown,
+  countRecentSignups,
+  computeTimeToCharter,
+  computeTrendSeries,
+} from "@/lib/metrics/compute";
 
-export default function Home() {
+function pct(n: number | null) {
+  return n === null ? "No data" : `${(n * 100).toFixed(0)}%`;
+}
+
+function num(n: number | null) {
+  return n === null ? "No data" : n.toLocaleString();
+}
+
+export default async function OverviewPage() {
+  const [data, syncLog] = await Promise.all([getDashboardData(), getSyncLogSummary()]);
+
+  if (!data.configured) {
+    return (
+      <>
+        <TopBar title="National Overview" latestSync={null} />
+        <main className="flex-1 space-y-6 p-6">
+          <SetupNotice />
+        </main>
+      </>
+    );
+  }
+
+  const chapterCounts = computeChapterCounts(data.chapters, data.summary);
+  const membership = computeMembershipStats(data.chapters, data.summary);
+  const statusBreakdown = computeStatusBreakdown(data.chapters, data.summary);
+  const rsoBreakdown = computeRsoBreakdown(data.summary);
+  const eventBreakdown = computeEventBreakdown(data.events);
+  const retention = computeRetention(data.snapshots);
+  const timeToCharter = computeTimeToCharter(data.chapters);
+  const trend = computeTrendSeries(data.snapshots);
+  const signupsTrend = computeSignupsTrend(data.signups);
+
+  const newSignupsLast30Days = countRecentSignups(data.signups, 30);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+    <>
+      <TopBar
+        title="National Overview"
+        subtitle="Across all reporting DFA chapters"
+        latestSync={data.latestSync}
+      />
+      <main className="flex-1 space-y-8 p-6">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Active Chapters"
+            value={num(chapterCounts.active)}
+            sublabel={`${num(chapterCounts.total)} total chapters`}
+            accent="navy"
+            icon={<Building2 size={20} />}
+          />
+          <StatCard
+            label="Total Members"
+            value={num(membership.totalMembers)}
+            sublabel={
+              membership.avgPerChapter !== null
+                ? `Avg ${membership.avgPerChapter.toFixed(0)} / chapter`
+                : "No member data reported"
+            }
+            accent="blue"
+            icon={<Users size={20} />}
+          />
+          <StatCard
+            label="Events Held"
+            value={eventBreakdown.total.toLocaleString()}
+            sublabel="All types, all time"
+            accent="gold"
+            icon={<CalendarCheck size={20} />}
+          />
+          <StatCard
+            label="Chapter Signups"
+            value={data.signups.length.toLocaleString()}
+            sublabel="Start-a-chapter submissions, all time"
+            accent="red"
+            icon={<UserPlus size={20} />}
+          />
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+            Chapter &amp; RSO Status
+          </h2>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card>
+              <h3 className="mb-3 text-sm font-medium text-navy/70">Chapter Status</h3>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <div className="text-2xl font-semibold text-[#0ca30c]">{num(statusBreakdown.active)}</div>
+                  <div className="text-xs text-navy/50">Active</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-semibold text-navy/60">{num(statusBreakdown.inactive)}</div>
+                  <div className="text-xs text-navy/50">Inactive</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-semibold text-gold">{num(statusBreakdown.pendingLaunch)}</div>
+                  <div className="text-xs text-navy/50">Pending Launch</div>
+                </div>
+              </div>
+            </Card>
+            <Card>
+              <h3 className="mb-3 text-sm font-medium text-navy/70">RSO Status</h3>
+              <div className="grid grid-cols-4 gap-3 text-center">
+                <div>
+                  <div className="text-2xl font-semibold text-[#0ca30c]">{num(rsoBreakdown.recognized)}</div>
+                  <div className="text-xs text-navy/50">Recognized</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-semibold text-gold">{num(rsoBreakdown.pending)}</div>
+                  <div className="text-xs text-navy/50">Pending</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-semibold text-red">{num(rsoBreakdown.notRecognized)}</div>
+                  <div className="text-xs text-navy/50">Not Recognized</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-semibold text-navy/60">{num(rsoBreakdown.expired)}</div>
+                  <div className="text-xs text-navy/50">Expired</div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+            Growth Over Time
+          </h2>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card>
+              <h3 className="mb-1 text-sm font-medium text-navy/70">Chapters on Roster</h3>
+              <TrendLineChart data={trend.map((t) => ({ date: t.date, value: t.chapters }))} valueLabel="Chapters" />
+            </Card>
+            <Card>
+              <h3 className="mb-1 text-sm font-medium text-navy/70">Total Members</h3>
+              <TrendLineChart data={trend.map((t) => ({ date: t.date, value: t.members }))} valueLabel="Members" />
+            </Card>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+            Chapter Signups
+          </h2>
+          <Card>
+            <h3 className="mb-1 text-sm font-medium text-navy/70">
+              &quot;Start a Chapter&quot; Submissions
+            </h3>
+            <RangeTrendChart data={signupsTrend} />
+          </Card>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+            Program Health
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Chapter Retention"
+              value={pct(retention.retentionRate)}
+              sublabel={
+                retention.previousTerm
+                  ? `${retention.previousTerm} → ${retention.currentTerm}`
+                  : "Need 2+ terms of data"
+              }
+              icon={<TrendingUp size={18} />}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            <StatCard
+              label="Avg. Time to Charter"
+              value={timeToCharter.avgDays !== null ? `${timeToCharter.avgDays.toFixed(0)}d` : "No data"}
+              sublabel={`${timeToCharter.chaptersReporting} chapters with both dates`}
+              icon={<Clock size={18} />}
+            />
+            <StatCard
+              label="New Signups (30d)"
+              value={newSignupsLast30Days.toLocaleString()}
+              sublabel="From the start-a-chapter form"
+              icon={<UserPlus size={18} />}
+            />
+          </div>
+        </section>
+
+        <Card>
+          <h3 className="mb-3 text-sm font-medium text-navy/70">Event Type Breakdown</h3>
+          <EventTypeBarChart data={eventBreakdown.byType.map((e) => ({ label: e.label, count: e.count }))} />
+        </Card>
+
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+            Chapters
+          </h2>
+          <ChaptersTable chapters={data.chapters} />
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+            Admin · Sync Status
+          </h2>
+          <AdminSyncPanel bySource={syncLog.bySource} recent={syncLog.recent} />
+        </section>
       </main>
-    </div>
+    </>
   );
 }
