@@ -15,7 +15,13 @@ export interface SyncStatusIndicatorProps {
 // recent sync attempt failed. Always paired with a text label — status
 // color is never the only signal, per accessibility guidance for status hues.
 export function SyncStatusIndicator({ initialLatest }: SyncStatusIndicatorProps) {
-  const [latest, setLatest] = useState<SyncLogRow | null>(initialLatest);
+  // Tracked separately from `initialLatest` — this component mounts once
+  // with initialLatest={null} while Overview.tsx is still loading, then
+  // re-renders with the real value once it arrives, so the prop can't be
+  // baked into useState's initial value (that would only ever see the first,
+  // null, render). liveLatest holds anything newer that arrives afterward
+  // via the realtime subscription.
+  const [liveLatest, setLiveLatest] = useState<SyncLogRow | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -28,9 +34,10 @@ export function SyncStatusIndicator({ initialLatest }: SyncStatusIndicatorProps)
         { event: "INSERT", schema: "public", table: "sync_log" },
         (payload) => {
           const row = payload.new as SyncLogRow;
-          setLatest((current) => {
-            if (!current) return row;
-            return new Date(row.created_at) > new Date(current.created_at) ? row : current;
+          setLiveLatest((current) => {
+            const currentBest = current ?? initialLatest;
+            if (!currentBest) return row;
+            return new Date(row.created_at) > new Date(currentBest.created_at) ? row : current;
           });
         }
       )
@@ -39,8 +46,9 @@ export function SyncStatusIndicator({ initialLatest }: SyncStatusIndicatorProps)
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [initialLatest]);
 
+  const latest = liveLatest ?? initialLatest;
   const ok = latest?.success ?? null;
 
   return (
