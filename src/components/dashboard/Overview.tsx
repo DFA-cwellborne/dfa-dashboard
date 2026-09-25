@@ -47,7 +47,7 @@ const REFRESH_INTERVAL_MS = 20_000;
 
 const METRIC_INFO = {
   chapterMap:
-    "One dot per chapter on the Chapter Master List, placed by its state. The sheet tracks state, not campus, so chapters in the same state fan out around the state's center rather than sitting at exact campus locations. New chapters appear automatically after the next sync.",
+    "One dot per chapter on the Chapter Master List, placed at its real campus location where we have one on file. Chapters we haven't mapped a campus for yet — and any that share a spot with another chapter — fan out around a shared center instead of stacking. New chapters appear automatically after the next sync.",
   activeChapters:
     "Chapters currently Active or Pending Launch, from the Chapter Master List tab in Google Sheets. “Total” includes inactive chapters too.",
   totalMembers:

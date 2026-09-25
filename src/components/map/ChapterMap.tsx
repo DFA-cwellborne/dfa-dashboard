@@ -144,7 +144,7 @@ export function ChapterMap({ chapters, info }: { chapters: ChapterRow[]; info: s
           <svg
             viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
             role="group"
-            aria-label="Map of DFA chapters by state"
+            aria-label="Map of DFA chapters by location"
             className="h-auto w-full"
           >
             {shapes.map((s) => (

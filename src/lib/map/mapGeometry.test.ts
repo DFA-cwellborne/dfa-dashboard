@@ -53,11 +53,36 @@ describe("state shapes", () => {
 });
 
 describe("placeChapterDots", () => {
-  it("puts a lone chapter exactly on its state's centroid", () => {
-    const { dots } = placeChapterDots([ch("Butler University", "IN")]);
+  it("puts a lone chapter with no known campus location exactly on its state's centroid", () => {
+    const { dots } = placeChapterDots([ch("Some Unmapped School", "IN")]);
     const [cx, cy] = getStateCentroid("IN")!;
     expect(dots).toHaveLength(1);
     expect([dots[0].x, dots[0].y]).toEqual([cx, cy]);
+  });
+
+  it("places a chapter with a known campus location at its real coordinates, not the state centroid", () => {
+    const { dots } = placeChapterDots([ch("Butler University", "IN")]);
+    const [stateCx, stateCy] = getStateCentroid("IN")!;
+    expect(dots).toHaveLength(1);
+    // Indianapolis is real and distinct from Indiana's geometric centroid.
+    expect(dist(dots[0], { x: stateCx, y: stateCy })).toBeGreaterThan(1);
+  });
+
+  it("keeps two chapters in the same state apart when their real campuses are far apart", () => {
+    // Abingdon, VA and Crozet, VA are on opposite ends of the state — this
+    // used to render as one stacked dot when placement only used state.
+    const { dots } = placeChapterDots([ch("Abingdon High School", "VA"), ch("Western Albemarle High School", "VA")]);
+    expect(dots).toHaveLength(2);
+    expect(dist(dots[0], dots[1])).toBeGreaterThan(50);
+  });
+
+  it("fans out multiple chapters that resolve to the same known campus location instead of stacking them", () => {
+    const { dots } = placeChapterDots([
+      { external_id: "a", name: "Butler University", state: "IN" },
+      { external_id: "b", name: "Butler University", state: "IN" },
+    ]);
+    expect(dots).toHaveLength(2);
+    expect(dist(dots[0], dots[1])).toBeGreaterThanOrEqual(15.9);
   });
 
   it("fans out same-state chapters so no two dots overlap", () => {
