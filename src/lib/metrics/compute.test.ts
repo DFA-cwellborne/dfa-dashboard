@@ -187,21 +187,43 @@ describe("computeTimeToCharter", () => {
 });
 
 describe("computeEventBreakdown", () => {
-  const event = (event_type: ChapterEventRow["event_type"]): ChapterEventRow => ({
-    id: "e", external_id: "e", chapter_external_id: "c1", event_type, event_date: null,
+  const event = (event_type: ChapterEventRow["event_type"], event_date: string | null = "2026-09-10"): ChapterEventRow => ({
+    id: "e", external_id: "e", chapter_external_id: "c1", event_type, event_date,
     attendee_count: null, volunteer_hours: null, source: "airtable", created_at: "",
   });
+  const TODAY = "2026-09-25";
 
-  it("counts by type, keeps zero-count types, and files untyped events under 'other'", () => {
-    const b = computeEventBreakdown([event("tabling"), event("tabling"), event(null)]);
-    expect(b.total).toBe(3);
-    const by = Object.fromEntries(b.byType.map((t) => [t.type, t.count]));
-    expect(by).toMatchObject({ tabling: 2, other: 1, social: 0, training: 0, voter_registration: 0 });
+  it("splits events into held (date today or earlier) and upcoming (still ahead) — the form is for planning", () => {
+    const b = computeEventBreakdown(
+      [event("Tabling", "2026-09-01"), event("Tabling", "2026-09-25"), event("Social", "2026-09-29")],
+      TODAY
+    );
+    expect(b).toMatchObject({ total: 3, held: 2, upcoming: 1, undated: 0 });
   });
 
-  it("is all zeros with no events", () => {
-    const b = computeEventBreakdown([]);
-    expect(b.total).toBe(0);
-    expect(b.byType.every((t) => t.count === 0)).toBe(true);
+  it("counts events with no usable date as undated rather than guessing held/upcoming", () => {
+    const b = computeEventBreakdown([event("Tabling", null), event("Tabling", "2026-09-01")], TODAY);
+    expect(b).toMatchObject({ total: 2, held: 1, upcoming: 0, undated: 1 });
+  });
+
+  it("uses the form's own type labels, most common first, instead of a fixed list", () => {
+    const b = computeEventBreakdown(
+      [event("Event From Campaign"), event("Tabling"), event("Tabling"), event("Social")],
+      TODAY
+    );
+    expect(b.byType.map((t) => [t.label, t.count])).toEqual([
+      ["Tabling", 2],
+      ["Event From Campaign", 1],
+      ["Social", 1],
+    ]);
+  });
+
+  it("files a missing type under 'Unspecified'", () => {
+    const b = computeEventBreakdown([event(null), event("  ")], TODAY);
+    expect(b.byType).toEqual([{ type: "Unspecified", label: "Unspecified", count: 2 }]);
+  });
+
+  it("is empty with no events", () => {
+    expect(computeEventBreakdown([], TODAY)).toEqual({ total: 0, held: 0, upcoming: 0, undated: 0, byType: [] });
   });
 });

@@ -105,28 +105,59 @@ describe("normalizeSignupRow", () => {
 });
 
 describe("normalizeEventRow", () => {
-  const event = (extra: Record<string, unknown>) => ({
+  // Field names exactly as the real Airtable event planning form sends them.
+  const SCHOOL = "Which school are you the President of? (DO NOT SHORTEN UNIVERSITY)";
+  const TYPE = "Pick an Event Type";
+  const DATE = "What date is this event planning to take place on?";
+  const event = (extra: Record<string, unknown> = {}) => ({
     "Record ID": "evt1",
-    "Which school are you a part of": "University of Oklahoma",
-    "Event Type": "Tabling",
-    "Event Date": "2026-09-10",
+    [SCHOOL]: "Crossroads College Prep",
+    [TYPE]: "Event From Campaign",
+    [DATE]: "2026-09-29",
+    "What's the purpose of the event?": "free text we don't use",
     ...extra,
   });
 
+  it("reads the real form's fields — regression: the event form was filled out but never showed up", () => {
+    const e = normalizeEventRow(event(), "airtable")!;
+    expect(e).toMatchObject({
+      externalId: "evt1",
+      chapterExternalId: "crossroads-college-prep",
+      eventType: "Event From Campaign",
+      eventDate: "2026-09-29",
+    });
+  });
+
   it("matches the school regardless of casing/whitespace (the free-text field drifts)", () => {
-    const a = normalizeEventRow(event({}), "airtable")!;
-    const b = normalizeEventRow(event({ "Which school are you a part of": "  UNIVERSITY OF   oklahoma " }), "airtable")!;
+    const a = normalizeEventRow(event({ [SCHOOL]: "University of Oklahoma" }), "airtable")!;
+    const b = normalizeEventRow(event({ [SCHOOL]: "  UNIVERSITY OF   oklahoma " }), "airtable")!;
     expect(a.chapterExternalId).toBe("university-of-oklahoma");
     expect(b.chapterExternalId).toBe(a.chapterExternalId);
   });
 
-  it("maps known event types and falls back to 'other'", () => {
-    expect(normalizeEventRow(event({ "Event Type": "Voter Registration Drive" }), "airtable")!.eventType).toBe("voter_registration");
-    expect(normalizeEventRow(event({ "Event Type": "Bake sale" }), "airtable")!.eventType).toBe("other");
+  it("survives the question being reworded, as long as it starts the same way", () => {
+    const row = { "Record ID": "e", "Which school are you a part of?": "Rice University", [TYPE]: "Tabling" };
+    expect(normalizeEventRow(row, "airtable")!.chapterExternalId).toBe("rice-university");
+  });
+
+  it("keeps the form's type label verbatim, so new dropdown options just work", () => {
+    expect(normalizeEventRow(event({ [TYPE]: "Tabling" }), "airtable")!.eventType).toBe("Tabling");
+    expect(normalizeEventRow(event({ [TYPE]: "Bake sale" }), "airtable")!.eventType).toBe("Bake sale");
+  });
+
+  it("uses 'Unspecified' when no type was picked", () => {
+    const row = event();
+    delete (row as Record<string, unknown>)[TYPE];
+    expect(normalizeEventRow(row, "airtable")!.eventType).toBe("Unspecified");
+  });
+
+  it("keeps an event with an unreadable date (undated) instead of dropping it", () => {
+    expect(normalizeEventRow(event({ [DATE]: "sometime soon" }), "airtable")!.eventDate).toBeNull();
+    expect(normalizeEventRow(event({ [DATE]: "sometime soon" }), "airtable")).not.toBeNull();
   });
 
   it("drops rows missing an id or a school", () => {
-    expect(normalizeEventRow(event({ "Which school are you a part of": "" }), "airtable")).toBeNull();
+    expect(normalizeEventRow(event({ [SCHOOL]: "" }), "airtable")).toBeNull();
     expect(normalizeEventRow(event({ "Record ID": "" }), "airtable")).toBeNull();
   });
 });
@@ -162,7 +193,7 @@ describe("personal data never passes through normalization", () => {
 
   it("events", () => {
     const e = normalizeEventRow(
-      { "Record ID": "e1", "Which school are you a part of": "Rice University", "What's your first and last name?": "Anna McCandless", Question: "amccandless@school.org" },
+      { "Record ID": "e1", "Which school are you the President of? (DO NOT SHORTEN UNIVERSITY)": "Rice University", "What's your first and last name?": "Anna McCandless", Question: "amccandless@school.org" },
       "airtable"
     );
     expect(e).not.toBeNull();

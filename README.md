@@ -69,11 +69,10 @@ must only import from `src/config/publicEnv.ts` instead.
 
 1. `.env.local` already has your real Supabase project, Google Sheet ID,
    Airtable, and Breakthru credentials filled in.
-2. **Run the migrations, in order** — copy the full contents of
-   `supabase/migrations/0001_init.sql` into your Supabase project's SQL
-   editor (Project → SQL Editor → New query) and run it, then do the same
-   with `0002_remove_unused_chapter_fields.sql`. Don't paste the file
-   *path*, paste the file's *contents*.
+2. **Run the migrations, in order** — copy the full contents of each file in
+   `supabase/migrations/` (`0001`, `0002`, `0003`) into your Supabase
+   project's SQL editor (Project → SQL Editor → New query) and run it. Don't
+   paste the file *path*, paste the file's *contents*. All are safe to re-run.
 3. `npm run dev`, then `npm run sync:run` in another terminal to pull real
    data in (or `npm run seed:mock` to test with generated sample data first —
    `src/lib/sync/mockAdapter.ts` mirrors the real shapes, including
@@ -114,6 +113,44 @@ The tests deliberately encode past bugs (dropped first chapter, missing counts t
 zero, the API key that reached the public sync log, dashboard blanking on a failed refresh)
 so they can't come back. Rule of thumb: if a bug gets fixed, add the test that would have
 caught it.
+
+### Privacy
+
+The dashboard reads Supabase with the **public anon key**, which ships in the site's
+JavaScript — so everything in the tables it reads is public. Therefore:
+
+- The sync stores only the fields the dashboard displays. It never stores raw source rows
+  (the Master List has presidents' names/emails/phones; the intake form has names, emails,
+  phones and zip codes). This was once violated; `raw` columns were dropped in migration `0003`.
+- Every query names its columns (`src/lib/data/columns.ts`) — never `select("*")` — so a
+  column added later can't silently become public. Tests enforce both rules.
+- `npm run health` reads the public tables like a stranger would and fails if any email or
+  phone number is visible.
+
+Before adding a field to the sync, ask: *would I be comfortable with this on a public web page?*
+
+### Stats and Map views
+
+The dashboard has two views, switched with the Stats / Map toggle under the header. The
+current view lives in the URL hash (`#map`), so a refresh stays put and a link can point
+straight at the map. Both views share one data load.
+
+### Events
+
+Events come from the chapters' Airtable *event planning* form, so an event is logged when it's
+filed — before it happens. "Events Logged" therefore splits into **held** (planned date today or
+earlier) and **upcoming**. Types are whatever the form's dropdown says, verbatim. Form fields are
+matched by pattern (`EVENT_FIELD_ALIASES`), so rewording a question is fine as long as it starts
+the same way.
+
+### Chapters that cease to exist
+
+When a chapter is deleted from the Master List, the next sync removes it from the dashboard
+(`src/lib/sync/prune.ts`). Because a bug here would delete real data, it is deliberately cautious:
+it only runs after a *successful* read, never on an empty result, refuses to remove a majority of
+chapters at once (and reports that as a failed sync instead), only touches rows from the source
+that was read, and only runs once migration `0003` has detached history from the chapters table —
+so deleting a chapter never erases its past trend snapshots or events.
 
 ### The chapter map
 

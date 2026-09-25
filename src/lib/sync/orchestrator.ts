@@ -12,6 +12,7 @@ import type {
 import { createAirtableAdapter } from "./airtableAdapter";
 import { createGoogleSheetsAdapter } from "./googleSheetsAdapter";
 import { createMockAdapter } from "./mockAdapter";
+import { historyStillAttachedToChapters, pruneChapters, type PruneDb } from "./prune";
 import { redactSecrets } from "./redact";
 
 function mergeChapters(bySource: Map<DataSource, Chapter[]>): Chapter[] {
@@ -29,6 +30,8 @@ function mergeChapters(bySource: Map<DataSource, Chapter[]>): Chapter[] {
 interface AdapterRunOutcome {
   source: DataSource;
   result: SyncResult;
+  /** True only if this adapter provides chapters AND its read of them succeeded. */
+  chaptersOk: boolean;
   chapters: Chapter[];
   summary: SheetSummary | null;
   signups: ChapterSignup[];
@@ -42,6 +45,7 @@ async function runAdapter(adapter: SourceAdapter): Promise<AdapterRunOutcome> {
   let summary: SheetSummary | null = null;
   let signups: ChapterSignup[] = [];
   let events: ChapterEvent[] = [];
+  let chaptersOk = false;
 
   function reportError(label: string, e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
@@ -51,6 +55,7 @@ async function runAdapter(adapter: SourceAdapter): Promise<AdapterRunOutcome> {
   if (adapter.fetchChapters) {
     try {
       chapters = await adapter.fetchChapters();
+      chaptersOk = true;
     } catch (e) {
       reportError("fetchChapters", e);
     }
@@ -80,6 +85,7 @@ async function runAdapter(adapter: SourceAdapter): Promise<AdapterRunOutcome> {
   const finishedAt = new Date().toISOString();
   return {
     source: adapter.source,
+    chaptersOk,
     chapters,
     summary,
     signups,
@@ -200,6 +206,36 @@ async function persistEvents(events: ChapterEvent[]) {
   if (error) throw new Error(`chapter_events upsert failed: ${error.message}`);
 }
 
+function chapterPruneDb(): PruneDb {
+  const supabase = getServiceRoleSupabase();
+  return {
+    async listChapterIds(source) {
+      const { data, error } = await supabase.from("chapters").select("external_id").eq("source", source);
+      if (error) throw new Error(`listing chapters failed: ${error.message}`);
+      return (data ?? []).map((r) => r.external_id);
+    },
+    async deleteChapters(ids) {
+      const { error } = await supabase.from("chapters").delete().in("external_id", ids);
+      if (error) throw new Error(`removing chapters failed: ${error.message}`);
+    },
+  };
+}
+
+/** Reads PostgREST's OpenAPI document to see whether history is still tied to the chapters table. */
+async function historyIsDetached(): Promise<boolean> {
+  if (!env.supabase.url || !env.supabase.serviceRoleKey) return false;
+  try {
+    const res = await fetch(`${env.supabase.url}/rest/v1/`, {
+      headers: { apikey: env.supabase.serviceRoleKey, Authorization: `Bearer ${env.supabase.serviceRoleKey}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return false;
+    return !historyStillAttachedToChapters(await res.json());
+  } catch {
+    return false; // can't tell -> assume attached -> don't delete
+  }
+}
+
 function buildAdapters(): SourceAdapter[] {
   if (env.sync.useMockData) {
     return [createMockAdapter()];
@@ -259,10 +295,33 @@ export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult[
     persistError = redactSecrets(e instanceof Error ? e.message : String(e));
   }
 
+  // Remove chapters that have disappeared from their source — but only for a
+  // source whose chapters we just read successfully and persisted cleanly.
+  const pruneErrors = new Map<DataSource, string>();
+  if (!persistError) {
+    const detached = outcomes.some((o) => o.chaptersOk) ? await historyIsDetached() : false;
+    for (const o of outcomes.filter((x) => x.chaptersOk)) {
+      try {
+        const out = await pruneChapters(chapterPruneDb(), {
+          source: o.source,
+          fetchedIds: o.chapters.map((c) => c.externalId),
+          historyDetached: detached,
+        });
+        if (out.deleted.length) console.log(`[sync] removed ${out.deleted.length} chapter(s) no longer in ${o.source}: ${out.deleted.join(", ")}`);
+        if (out.skipped && out.suspicious) pruneErrors.set(o.source, `chapter removal skipped: ${out.skipped}`);
+        else if (out.skipped) console.warn(`[sync] chapter removal skipped: ${out.skipped}`);
+      } catch (e) {
+        pruneErrors.set(o.source, `chapter removal failed: ${redactSecrets(e instanceof Error ? e.message : String(e))}`);
+      }
+    }
+  }
+
   const results = outcomes.map((o) => {
     if (persistError) {
       return { ...o.result, success: false, errors: [...o.result.errors, persistError] };
     }
+    const pruneError = pruneErrors.get(o.source);
+    if (pruneError) return { ...o.result, success: false, errors: [...o.result.errors, pruneError] };
     return o.result;
   });
 

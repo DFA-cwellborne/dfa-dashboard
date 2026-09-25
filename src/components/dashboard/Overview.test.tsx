@@ -36,10 +36,14 @@ const DATA: DashboardData = {
 const LOG: SyncLogSummary = { bySource: { google_sheets: SYNC }, recent: [SYNC] };
 
 beforeEach(() => {
+  window.scrollTo = vi.fn() as unknown as typeof window.scrollTo; // jsdom doesn't implement it
   mockData.mockReset().mockResolvedValue(DATA);
   mockLog.mockReset().mockResolvedValue(LOG);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.location.hash = "";
+});
 
 const status = () => screen.getByTestId("refresh-status").textContent ?? "";
 const refreshButton = () => screen.getByRole("button", { name: "Refresh data" }) as HTMLButtonElement;
@@ -53,11 +57,71 @@ describe("Overview", () => {
     expect(mockData).toHaveBeenCalledTimes(1);
   });
 
-  it("puts the chapter map first, above the stat cards", async () => {
-    render(<Overview />);
-    const map = await screen.findByText("Chapter Map");
-    const stats = screen.getByText("Active Chapters");
-    expect(map.compareDocumentPosition(stats) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  describe("Stats / Map views", () => {
+    const tab = (name: string) => screen.getByRole("tab", { name }) as HTMLButtonElement;
+
+    it("opens on Stats, with the map on its own view rather than crowding the stats page", async () => {
+      render(<Overview />);
+      await screen.findByText("Active Chapters");
+      expect(tab("Stats").getAttribute("aria-selected")).toBe("true");
+      expect(tab("Map").getAttribute("aria-selected")).toBe("false");
+      expect(screen.queryByText("Chapter Map")).toBeNull();
+    });
+
+    it("switches to the map and hides the stats", async () => {
+      render(<Overview />);
+      await screen.findByText("Active Chapters");
+      fireEvent.click(tab("Map"));
+
+      expect(await screen.findByText("Chapter Map")).toBeTruthy();
+      expect(screen.getAllByTestId("chapter-dot")).toHaveLength(1);
+      expect(screen.queryByText("Active Chapters")).toBeNull();
+      expect(tab("Map").getAttribute("aria-selected")).toBe("true");
+      expect(window.location.hash).toBe("#map");
+    });
+
+    it("switches back to the stats", async () => {
+      render(<Overview />);
+      await screen.findByText("Active Chapters");
+      fireEvent.click(tab("Map"));
+      await screen.findByText("Chapter Map");
+      fireEvent.click(tab("Stats"));
+      expect(await screen.findByText("Active Chapters")).toBeTruthy();
+      expect(screen.queryByText("Chapter Map")).toBeNull();
+    });
+
+    it("stays on the map after a refresh, because the view lives in the URL (#map)", async () => {
+      window.location.hash = "#map";
+      render(<Overview />);
+      expect(await screen.findByText("Chapter Map")).toBeTruthy();
+      expect(screen.queryByText("Active Chapters")).toBeNull();
+    });
+
+    it("doesn't refetch when switching views — both views share one load", async () => {
+      render(<Overview />);
+      await screen.findByText("Active Chapters");
+      fireEvent.click(tab("Map"));
+      await screen.findByText("Chapter Map");
+      fireEvent.click(tab("Stats"));
+      await screen.findByText("Active Chapters");
+      expect(mockData).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the refresh controls and status on both views", async () => {
+      render(<Overview />);
+      await screen.findByText("Active Chapters");
+      fireEvent.click(tab("Map"));
+      await screen.findByText("Chapter Map");
+      expect(screen.getByRole("button", { name: "Refresh data" })).toBeTruthy();
+      expect(status()).toMatch(/^Checked /);
+    });
+
+    it("can be driven from the keyboard with the arrow keys", async () => {
+      render(<Overview />);
+      await screen.findByText("Active Chapters");
+      fireEvent.keyDown(tab("Stats"), { key: "ArrowRight" });
+      expect(await screen.findByText("Chapter Map")).toBeTruthy();
+    });
   });
 
   it("shows both when data last synced and when this page last checked", async () => {

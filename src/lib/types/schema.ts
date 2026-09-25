@@ -57,18 +57,13 @@ export interface ChapterSignup {
   source: DataSource;
 }
 
-export type EventType =
-  | "voter_registration"
-  | "tabling"
-  | "social"
-  | "training"
-  | "other";
 
 export interface ChapterEvent {
   externalId: string;
   /** Slugified chapter/school name — matched case-insensitively to a Chapter's externalId. */
   chapterExternalId: string;
-  eventType: EventType;
+  /** The event form's own type label, verbatim (e.g. "Tabling"). */
+  eventType: string;
   eventDate: string | null;
   attendeeCount: number | null;
   volunteerHours: number | null;

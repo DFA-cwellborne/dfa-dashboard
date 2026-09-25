@@ -13,6 +13,8 @@ import { RangeTrendChart } from "@/components/charts/RangeTrendChart";
 import { EventTypeBarChart } from "@/components/charts/EventTypeBarChart";
 import { ChaptersTable } from "@/components/chapters/ChaptersTable";
 import { ChapterMap } from "@/components/map/ChapterMap";
+import { ViewSwitcher, useView } from "@/components/layout/ViewSwitcher";
+import { localToday } from "@/lib/format/date";
 import { AdminSyncPanel } from "@/components/admin/AdminSyncPanel";
 import { getDashboardData, getSyncLogSummary, type DashboardData, type SyncLogSummary } from "@/lib/data/queries";
 import {
@@ -50,7 +52,8 @@ const METRIC_INFO = {
     "Chapters currently Active or Pending Launch, from the Chapter Master List tab in Google Sheets. “Total” includes inactive chapters too.",
   totalMembers:
     "Sum of member counts from the Google Sheets chapter roster. Average only counts chapters that have reported a member count.",
-  eventsHeld: "Total events logged in the Airtable events base, across all chapters and event types.",
+  eventsLogged:
+    "Events submitted through the chapters' Airtable event planning form, counted as soon as they're filed. \u201cHeld\u201d means the planned date is today or earlier; \u201cupcoming\u201d means it's still ahead.",
   chapterSignups:
     "“Start a chapter” submissions from the Airtable intake form, filtered to responses that specifically asked to start or join a chapter.",
   chapterStatus: "Active / Inactive / Pending Launch counts, read directly from the Google Sheets Home tab's status table.",
@@ -64,7 +67,7 @@ const METRIC_INFO = {
   timeToCharter:
     "Average days between a chapter's signup date and its charter date. Not yet wired up — would need a signup-date source (e.g. Calendly) plus Airtable's charter date.",
   newSignups: "“Start a chapter” submissions from the last 30 days.",
-  eventBreakdown: "Events by type (tabling, social, training, other), from the Airtable events base.",
+  eventBreakdown: "Events by the type chosen on the Airtable event planning form, most common first.",
   chaptersTable:
     "One row per chapter from the Chapter Master List tab in Google Sheets — name, school type, state, status, and member count.",
 } as const;
@@ -79,6 +82,7 @@ export function Overview() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [syncLog, setSyncLog] = useState<SyncLogSummary | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [view, setView] = useView();
   const [refreshing, setRefreshing] = useState(false);
   // When this page last successfully re-read Supabase. Distinct from the sync
   // time: syncs only land every 20 minutes, so without this a refresh that
@@ -167,7 +171,7 @@ export function Overview() {
   const membership = computeMembershipStats(data.chapters, data.summary);
   const statusBreakdown = computeStatusBreakdown(data.chapters, data.summary);
   const rsoBreakdown = computeRsoBreakdown(data.summary);
-  const eventBreakdown = computeEventBreakdown(data.events);
+  const eventBreakdown = computeEventBreakdown(data.events, localToday());
   const retention = computeRetention(data.snapshots);
   const timeToCharter = computeTimeToCharter(data.chapters);
   const trend = computeTrendSeries(data.snapshots);
@@ -187,183 +191,195 @@ export function Overview() {
         onRefresh={handleManualRefresh}
         refreshing={refreshing}
       />
-      <main className="flex-1 space-y-8 p-6">
-        <ChapterMap chapters={data.chapters} info={METRIC_INFO.chapterMap} />
+      <div className="px-6 pt-5">
+        <ViewSwitcher view={view} onChange={setView} />
+      </div>
+      <main
+        id="dashboard-view"
+        role="tabpanel"
+        aria-labelledby={`tab-${view}`}
+        className="flex-1 space-y-8 p-6"
+      >
+        {view === "map" ? (
+          <ChapterMap chapters={data.chapters} info={METRIC_INFO.chapterMap} />
+        ) : (
+          <>
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                label="Active Chapters"
+                info={METRIC_INFO.activeChapters}
+                value={num(chapterCounts.active)}
+                sublabel={`${num(chapterCounts.total)} total chapters`}
+                accent="navy"
+                icon={<Building2 size={20} />}
+              />
+              <StatCard
+                label="Total Members"
+                info={METRIC_INFO.totalMembers}
+                value={num(membership.totalMembers)}
+                sublabel={
+                  membership.avgPerChapter !== null
+                    ? `Avg ${membership.avgPerChapter.toFixed(0)} / chapter`
+                    : "No member data reported"
+                }
+                accent="blue"
+                icon={<Users size={20} />}
+              />
+              <StatCard
+                label="Events Logged"
+                info={METRIC_INFO.eventsLogged}
+                value={eventBreakdown.total.toLocaleString()}
+                sublabel={`${eventBreakdown.held} held · ${eventBreakdown.upcoming} upcoming${eventBreakdown.undated ? ` · ${eventBreakdown.undated} undated` : ""}`}
+                accent="gold"
+                icon={<CalendarCheck size={20} />}
+              />
+              <StatCard
+                label="Chapter Signups"
+                info={METRIC_INFO.chapterSignups}
+                value={data.signups.length.toLocaleString()}
+                sublabel="Start-a-chapter submissions, all time"
+                accent="red"
+                icon={<UserPlus size={20} />}
+              />
+            </section>
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Active Chapters"
-            info={METRIC_INFO.activeChapters}
-            value={num(chapterCounts.active)}
-            sublabel={`${num(chapterCounts.total)} total chapters`}
-            accent="navy"
-            icon={<Building2 size={20} />}
-          />
-          <StatCard
-            label="Total Members"
-            info={METRIC_INFO.totalMembers}
-            value={num(membership.totalMembers)}
-            sublabel={
-              membership.avgPerChapter !== null
-                ? `Avg ${membership.avgPerChapter.toFixed(0)} / chapter`
-                : "No member data reported"
-            }
-            accent="blue"
-            icon={<Users size={20} />}
-          />
-          <StatCard
-            label="Events Held"
-            info={METRIC_INFO.eventsHeld}
-            value={eventBreakdown.total.toLocaleString()}
-            sublabel="All types, all time"
-            accent="gold"
-            icon={<CalendarCheck size={20} />}
-          />
-          <StatCard
-            label="Chapter Signups"
-            info={METRIC_INFO.chapterSignups}
-            value={data.signups.length.toLocaleString()}
-            sublabel="Start-a-chapter submissions, all time"
-            accent="red"
-            icon={<UserPlus size={20} />}
-          />
-        </section>
+            <section>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+                Chapter &amp; RSO Status
+              </h2>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Card>
+                  <h3 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-navy/70">
+                    Chapter Status
+                    <InfoTooltip text={METRIC_INFO.chapterStatus} />
+                  </h3>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <div className="text-2xl font-semibold text-[#0ca30c]">{num(statusBreakdown.active)}</div>
+                      <div className="text-xs text-navy/50">Active</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-semibold text-navy/60">{num(statusBreakdown.inactive)}</div>
+                      <div className="text-xs text-navy/50">Inactive</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-semibold text-gold">{num(statusBreakdown.pendingLaunch)}</div>
+                      <div className="text-xs text-navy/50">Pending Launch</div>
+                    </div>
+                  </div>
+                </Card>
+                <Card>
+                  <h3 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-navy/70">
+                    RSO Status
+                    <InfoTooltip text={METRIC_INFO.rsoStatus} />
+                  </h3>
+                  <div className="grid grid-cols-4 gap-3 text-center">
+                    <div>
+                      <div className="text-2xl font-semibold text-[#0ca30c]">{num(rsoBreakdown.recognized)}</div>
+                      <div className="text-xs text-navy/50">Recognized</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-semibold text-gold">{num(rsoBreakdown.pending)}</div>
+                      <div className="text-xs text-navy/50">Pending</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-semibold text-red">{num(rsoBreakdown.notRecognized)}</div>
+                      <div className="text-xs text-navy/50">Not Recognized</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-semibold text-navy/60">{num(rsoBreakdown.expired)}</div>
+                      <div className="text-xs text-navy/50">Expired</div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </section>
 
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
-            Chapter &amp; RSO Status
-          </h2>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <section>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+                Growth Over Time
+              </h2>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <Card>
+                  <h3 className="mb-1 flex items-center gap-1.5 text-sm font-medium text-navy/70">
+                    Chapters on Roster
+                    <InfoTooltip text={METRIC_INFO.chaptersTrend} />
+                  </h3>
+                  <TrendLineChart data={trend.map((t) => ({ date: t.date, value: t.chapters }))} valueLabel="Chapters" />
+                </Card>
+                <Card>
+                  <h3 className="mb-1 flex items-center gap-1.5 text-sm font-medium text-navy/70">
+                    Total Members
+                    <InfoTooltip text={METRIC_INFO.membersTrend} />
+                  </h3>
+                  <TrendLineChart data={trend.map((t) => ({ date: t.date, value: t.members }))} valueLabel="Members" />
+                </Card>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+                Chapter Signups
+              </h2>
+              <Card>
+                <h3 className="mb-1 flex items-center gap-1.5 text-sm font-medium text-navy/70">
+                  &quot;Start a Chapter&quot; Submissions
+                  <InfoTooltip text={METRIC_INFO.signupsRange} />
+                </h3>
+                <RangeTrendChart data={signupsTrend} />
+              </Card>
+            </section>
+
+            <section>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+                Program Health
+              </h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <StatCard
+                  label="Chapter Retention"
+                  info={METRIC_INFO.retention}
+                  value={pct(retention.retentionRate)}
+                  sublabel={
+                    retention.previousTerm
+                      ? `${retention.previousTerm} → ${retention.currentTerm}`
+                      : "Need 2+ terms of data"
+                  }
+                  icon={<TrendingUp size={18} />}
+                />
+                <StatCard
+                  label="Avg. Time to Charter"
+                  info={METRIC_INFO.timeToCharter}
+                  value={timeToCharter.avgDays !== null ? `${timeToCharter.avgDays.toFixed(0)}d` : "No data"}
+                  sublabel={`${timeToCharter.chaptersReporting} chapters with both dates`}
+                  icon={<Clock size={18} />}
+                />
+                <StatCard
+                  label="New Signups (30d)"
+                  info={METRIC_INFO.newSignups}
+                  value={newSignupsLast30Days.toLocaleString()}
+                  sublabel="From the start-a-chapter form"
+                  icon={<UserPlus size={18} />}
+                />
+              </div>
+            </section>
+
             <Card>
               <h3 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-navy/70">
-                Chapter Status
-                <InfoTooltip text={METRIC_INFO.chapterStatus} />
+                Event Type Breakdown
+                <InfoTooltip text={METRIC_INFO.eventBreakdown} />
               </h3>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <div className="text-2xl font-semibold text-[#0ca30c]">{num(statusBreakdown.active)}</div>
-                  <div className="text-xs text-navy/50">Active</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-semibold text-navy/60">{num(statusBreakdown.inactive)}</div>
-                  <div className="text-xs text-navy/50">Inactive</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-semibold text-gold">{num(statusBreakdown.pendingLaunch)}</div>
-                  <div className="text-xs text-navy/50">Pending Launch</div>
-                </div>
-              </div>
+              <EventTypeBarChart data={eventBreakdown.byType.map((e) => ({ label: e.label, count: e.count }))} />
             </Card>
-            <Card>
-              <h3 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-navy/70">
-                RSO Status
-                <InfoTooltip text={METRIC_INFO.rsoStatus} />
-              </h3>
-              <div className="grid grid-cols-4 gap-3 text-center">
-                <div>
-                  <div className="text-2xl font-semibold text-[#0ca30c]">{num(rsoBreakdown.recognized)}</div>
-                  <div className="text-xs text-navy/50">Recognized</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-semibold text-gold">{num(rsoBreakdown.pending)}</div>
-                  <div className="text-xs text-navy/50">Pending</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-semibold text-red">{num(rsoBreakdown.notRecognized)}</div>
-                  <div className="text-xs text-navy/50">Not Recognized</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-semibold text-navy/60">{num(rsoBreakdown.expired)}</div>
-                  <div className="text-xs text-navy/50">Expired</div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </section>
 
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
-            Growth Over Time
-          </h2>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card>
-              <h3 className="mb-1 flex items-center gap-1.5 text-sm font-medium text-navy/70">
-                Chapters on Roster
-                <InfoTooltip text={METRIC_INFO.chaptersTrend} />
-              </h3>
-              <TrendLineChart data={trend.map((t) => ({ date: t.date, value: t.chapters }))} valueLabel="Chapters" />
-            </Card>
-            <Card>
-              <h3 className="mb-1 flex items-center gap-1.5 text-sm font-medium text-navy/70">
-                Total Members
-                <InfoTooltip text={METRIC_INFO.membersTrend} />
-              </h3>
-              <TrendLineChart data={trend.map((t) => ({ date: t.date, value: t.members }))} valueLabel="Members" />
-            </Card>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
-            Chapter Signups
-          </h2>
-          <Card>
-            <h3 className="mb-1 flex items-center gap-1.5 text-sm font-medium text-navy/70">
-              &quot;Start a Chapter&quot; Submissions
-              <InfoTooltip text={METRIC_INFO.signupsRange} />
-            </h3>
-            <RangeTrendChart data={signupsTrend} />
-          </Card>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
-            Program Health
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatCard
-              label="Chapter Retention"
-              info={METRIC_INFO.retention}
-              value={pct(retention.retentionRate)}
-              sublabel={
-                retention.previousTerm
-                  ? `${retention.previousTerm} → ${retention.currentTerm}`
-                  : "Need 2+ terms of data"
-              }
-              icon={<TrendingUp size={18} />}
-            />
-            <StatCard
-              label="Avg. Time to Charter"
-              info={METRIC_INFO.timeToCharter}
-              value={timeToCharter.avgDays !== null ? `${timeToCharter.avgDays.toFixed(0)}d` : "No data"}
-              sublabel={`${timeToCharter.chaptersReporting} chapters with both dates`}
-              icon={<Clock size={18} />}
-            />
-            <StatCard
-              label="New Signups (30d)"
-              info={METRIC_INFO.newSignups}
-              value={newSignupsLast30Days.toLocaleString()}
-              sublabel="From the start-a-chapter form"
-              icon={<UserPlus size={18} />}
-            />
-          </div>
-        </section>
-
-        <Card>
-          <h3 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-navy/70">
-            Event Type Breakdown
-            <InfoTooltip text={METRIC_INFO.eventBreakdown} />
-          </h3>
-          <EventTypeBarChart data={eventBreakdown.byType.map((e) => ({ label: e.label, count: e.count }))} />
-        </Card>
-
-        <section>
-          <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-navy/50">
-            Chapters
-            <InfoTooltip text={METRIC_INFO.chaptersTable} />
-          </h2>
-          <ChaptersTable chapters={data.chapters} />
-        </section>
+            <section>
+              <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-navy/50">
+                Chapters
+                <InfoTooltip text={METRIC_INFO.chaptersTable} />
+              </h2>
+              <ChaptersTable chapters={data.chapters} />
+            </section>
+          </>
+        )}
       </main>
 
       {adminOpen && (

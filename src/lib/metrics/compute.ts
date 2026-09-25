@@ -124,31 +124,43 @@ export function computeMembershipStats(
   };
 }
 
-export const EVENT_TYPE_LABELS: Record<string, string> = {
-  voter_registration: "Voter Registration Drives",
-  tabling: "Tabling",
-  social: "Socials",
-  training: "Trainings / Onboarding",
-  other: "Other",
-};
-
 export interface EventBreakdown {
+  /** Every event logged, past or planned. */
   total: number;
+  /** Planned date is today or earlier. */
+  held: number;
+  /** Planned date is still ahead. */
+  upcoming: number;
+  /** Logged without a usable date. */
+  undated: number;
+  /** By the form's own type labels, most common first. */
   byType: { type: string; label: string; count: number }[];
 }
 
-export function computeEventBreakdown(events: ChapterEventRow[]): EventBreakdown {
+/**
+ * The events form is a *planning* form: an event is logged when a chapter
+ * files it, before it happens. So "logged" and "held" differ — `today` (a
+ * YYYY-MM-DD in the viewer's timezone) splits them. Types are whatever the
+ * form's dropdown says, not a list baked in here.
+ */
+export function computeEventBreakdown(events: ChapterEventRow[], today: string): EventBreakdown {
   const counts = new Map<string, number>();
+  let held = 0;
+  let upcoming = 0;
+  let undated = 0;
+
   for (const e of events) {
-    const key = e.event_type ?? "other";
+    const key = e.event_type?.trim() || "Unspecified";
     counts.set(key, (counts.get(key) ?? 0) + 1);
+    if (!e.event_date) undated++;
+    else if (e.event_date > today) upcoming++;
+    else held++;
   }
-  const byType = Object.keys(EVENT_TYPE_LABELS).map((type) => ({
-    type,
-    label: EVENT_TYPE_LABELS[type],
-    count: counts.get(type) ?? 0,
-  }));
-  return { total: events.length, byType };
+
+  const byType = Array.from(counts, ([type, count]) => ({ type, label: type, count })).sort(
+    (a, b) => b.count - a.count || a.label.localeCompare(b.label)
+  );
+  return { total: events.length, held, upcoming, undated, byType };
 }
 
 export interface RetentionStats {

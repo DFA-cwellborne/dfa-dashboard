@@ -82,40 +82,26 @@ export const SIGNUP_INTENT_FIELDS = [
 ] as const;
 
 // ---------------------------------------------------------------------------
-// Airtable — events hosted by chapters (a separate base). The "which school"
-// field is free text and may not match the sheet roster's casing/spacing —
-// see slugifyName() in src/lib/types/schema.ts, used on both sides so
-// "Ohio State", "ohio state", " Ohio State " all resolve to the same chapter.
+// Airtable — events, from the chapters' event *planning* form (a separate
+// base). The school field is free text and may not match the sheet roster's
+// casing/spacing — see slugifyName() in src/lib/types/schema.ts, used on both
+// sides so "Ohio State", "ohio state", " Ohio State " resolve to the same
+// chapter. The real form's labels are long and wordy ("Which school are you
+// the President of? (DO NOT SHORTEN UNIVERSITY)"), so the important ones are
+// matched by pattern; a reworded question keeps working as long as it starts
+// the same way. The date is when the event is *planned* to happen, so an event
+// can be logged before it's held.
 // ---------------------------------------------------------------------------
-export const EVENT_FIELD_ALIASES = {
+export const EVENT_FIELD_ALIASES: Record<
+  "externalId" | "chapterExternalId" | "eventType" | "eventDate" | "attendeeCount" | "volunteerHours",
+  readonly HeaderAlias[]
+> = {
   externalId: ["Record ID", "Event ID"],
-  chapterExternalId: [
-    "Which school are you a part of",
-    "Which school are you a part of?",
-    "School",
-    "Chapter",
-    "Chapter Name",
-  ],
-  eventType: ["Event Type", "Type"],
-  eventDate: ["Event Date", "Date"],
+  chapterExternalId: [/^which school/i, "School", "Chapter", "Chapter Name"],
+  eventType: ["Pick an Event Type", "Event Type", "Type"],
+  eventDate: [/^what date is this event/i, "Event Date", "Date"],
   attendeeCount: ["Attendee Count", "# Attendees", "Attendance", "Number Registered"],
   volunteerHours: ["Volunteer Hours", "Hours Logged"],
-} as const;
-
-export const EVENT_TYPE_VALUE_MAP: Record<
-  string,
-  "voter_registration" | "tabling" | "social" | "training" | "other"
-> = {
-  "voter registration": "voter_registration",
-  "voter registration drive": "voter_registration",
-  tabling: "tabling",
-  social: "social",
-  socials: "social",
-  training: "training",
-  trainings: "training",
-  onboarding: "training",
-  "trainings/onboarding": "training",
-  other: "other",
 };
 
 export const SCHOOL_TYPE_VALUE_MAP: Record<string, "HS" | "College"> = {
@@ -126,17 +112,22 @@ export const SCHOOL_TYPE_VALUE_MAP: Record<string, "HS" | "College"> = {
   univ: "College",
 };
 
-/** Finds the first alias present as a key in `row`, case-insensitively. */
-export function resolveHeader(row: Record<string, unknown>, aliases: readonly string[]) {
+/** A header to look for: exact text (case-insensitive) or a pattern for long/wordy labels. */
+export type HeaderAlias = string | RegExp;
+
+/** Finds the first alias present as a key in `row`; earlier aliases win. */
+export function resolveHeader(row: Record<string, unknown>, aliases: readonly HeaderAlias[]) {
   const keys = Object.keys(row);
   for (const alias of aliases) {
-    const match = keys.find((k) => k.trim().toLowerCase() === alias.trim().toLowerCase());
+    const match = keys.find((k) =>
+      typeof alias === "string" ? k.trim().toLowerCase() === alias.trim().toLowerCase() : alias.test(k.trim())
+    );
     if (match) return match;
   }
   return undefined;
 }
 
-export function getField(row: Record<string, unknown>, aliases: readonly string[]) {
+export function getField(row: Record<string, unknown>, aliases: readonly HeaderAlias[]) {
   const header = resolveHeader(row, aliases);
   if (!header) return undefined;
   const value = row[header];

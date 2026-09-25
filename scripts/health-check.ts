@@ -66,7 +66,9 @@ async function checkSupabase() {
       const res = await rest(`${table}?select=*&limit=1000`);
       const text = await res.text();
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const hits = [EMAIL.test(text) && "email addresses", PHONE.test(text) && "phone numbers"].filter(Boolean);
+      const rows = JSON.parse(text) as { raw?: unknown }[];
+      const storesRaw = rows.some((r) => r.raw && typeof r.raw === "object" && Object.keys(r.raw).length > 0);
+      const hits = [EMAIL.test(text) && "email addresses", PHONE.test(text) && "phone numbers", storesRaw && "raw source rows"].filter(Boolean);
       record(hits.length ? "FAIL" : "PASS", `No personal data publicly readable: ${table}`, hits.length ? `PUBLIC DATA CONTAINS ${hits.join(" + ")}` : "no emails/phones");
     } catch (e) {
       record("FAIL", `No personal data publicly readable: ${table}`, String(e));

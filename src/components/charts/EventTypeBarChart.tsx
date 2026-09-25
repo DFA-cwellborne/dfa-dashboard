@@ -1,16 +1,19 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-// Validated categorical palette, slots 1-5 (fixed order — see dataviz skill's
-// references/palette.md). Three of these slots sit below 3:1 contrast on a
-// white surface by design, so we ship the required relief: direct value
-// labels on every bar (below) rather than relying on hue alone.
-const CATEGORICAL = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"];
+// One measure (count) across categories that are named on the axis, so one
+// hue — not a palette cycled by row position, which would repaint bars as the
+// ranking changes and run out of colors when the form gains new types.
+const BAR_COLOR = "#2a78d6";
+const ROW_HEIGHT = 34;
+const MAX_LABEL_CHARS = 28;
 
 export interface EventTypeBarChartProps {
   data: { label: string; count: number }[];
 }
+
+const shorten = (s: string) => (s.length > MAX_LABEL_CHARS ? `${s.slice(0, MAX_LABEL_CHARS - 1)}…` : s);
 
 export function EventTypeBarChart({ data }: EventTypeBarChartProps) {
   const hasData = data.some((d) => d.count > 0);
@@ -23,27 +26,25 @@ export function EventTypeBarChart({ data }: EventTypeBarChartProps) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={240}>
-      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 24, left: 4, bottom: 4 }} barCategoryGap={10}>
+    <ResponsiveContainer width="100%" height={Math.max(120, 32 + data.length * ROW_HEIGHT)}>
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 32, left: 4, bottom: 4 }} barCategoryGap={10}>
         <CartesianGrid stroke="#e1e0d9" horizontal={false} />
         <XAxis type="number" hide allowDecimals={false} />
         <YAxis
           type="category"
           dataKey="label"
-          width={150}
+          width={180}
+          tickFormatter={shorten}
           tick={{ fontSize: 12, fill: "#52514e" }}
           axisLine={false}
           tickLine={false}
         />
-        <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={22}>
-          {data.map((entry, i) => (
-            <Cell key={entry.label} fill={CATEGORICAL[i % CATEGORICAL.length]} />
-          ))}
-          <LabelList
-            dataKey="count"
-            position="right"
-            style={{ fill: "#0b0b0b", fontSize: 12, fontWeight: 600 }}
-          />
+        <Tooltip
+          cursor={{ fill: "rgba(31,43,81,0.04)" }}
+          formatter={(value) => [`${value} ${value === 1 ? "event" : "events"}`, "Logged"]}
+        />
+        <Bar dataKey="count" fill={BAR_COLOR} radius={[0, 4, 4, 0]} maxBarSize={22}>
+          <LabelList dataKey="count" position="right" style={{ fill: "#0b0b0b", fontSize: 12, fontWeight: 600 }} />
         </Bar>
       </BarChart>
     </ResponsiveContainer>

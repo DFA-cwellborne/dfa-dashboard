@@ -34,7 +34,7 @@ export type ChapterEventRow = {
   id: string;
   external_id: string;
   chapter_external_id: string;
-  event_type: "voter_registration" | "tabling" | "social" | "training" | "other" | null;
+  event_type: string | null;
   event_date: string | null;
   attendee_count: number | null;
   volunteer_hours: number | null;

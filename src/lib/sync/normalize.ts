@@ -1,6 +1,5 @@
 import {
   EVENT_FIELD_ALIASES,
-  EVENT_TYPE_VALUE_MAP,
   MASTER_LIST_SCHOOL_TYPE_MAP,
   MASTER_LIST_STATUS_MAP,
   SCHOOL_TYPE_VALUE_MAP,
@@ -107,8 +106,9 @@ export function normalizeEventRow(
     // Slugified the same way as the roster's externalId, so casing/whitespace
     // differences in the free-text "which school" field still match up.
     chapterExternalId: slugifyName(chapterName),
-    eventType:
-      mapEnum(getField(row, EVENT_FIELD_ALIASES.eventType), EVENT_TYPE_VALUE_MAP) ?? "other",
+    // The form's own label ("Tabling", "Event From Campaign", ...), verbatim —
+    // the dropdown's options belong to the form, not to this code.
+    eventType: toStringOrNull(getField(row, EVENT_FIELD_ALIASES.eventType)) ?? "Unspecified",
     eventDate: toIsoDateOrNull(getField(row, EVENT_FIELD_ALIASES.eventDate)),
     attendeeCount: toNumberOrNull(getField(row, EVENT_FIELD_ALIASES.attendeeCount)),
     volunteerHours: toNumberOrNull(getField(row, EVENT_FIELD_ALIASES.volunteerHours)),
