@@ -57,6 +57,22 @@ async function checkSupabase() {
     record("FAIL", "Sheet summary present", String(e));
   }
 
+  // Privacy: everything below is readable by ANY visitor (the anon key is in the site's JS).
+  // Read the tables exactly as a stranger could — every column — and look for personal data.
+  const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/;
+  const PHONE = /\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}/;
+  for (const table of ["chapters", "chapter_signups", "chapter_events"]) {
+    try {
+      const res = await rest(`${table}?select=*&limit=1000`);
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const hits = [EMAIL.test(text) && "email addresses", PHONE.test(text) && "phone numbers"].filter(Boolean);
+      record(hits.length ? "FAIL" : "PASS", `No personal data publicly readable: ${table}`, hits.length ? `PUBLIC DATA CONTAINS ${hits.join(" + ")}` : "no emails/phones");
+    } catch (e) {
+      record("FAIL", `No personal data publicly readable: ${table}`, String(e));
+    }
+  }
+
   // Sync freshness + reliability, per source.
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   try {

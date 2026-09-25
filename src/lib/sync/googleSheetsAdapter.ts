@@ -124,7 +124,6 @@ export function parseHomeSheet(data: Awaited<ReturnType<typeof fetchHomeRanges>>
       expired: findByMap(rsoCounts, RSO_LABEL_MAP, "expired"),
     },
     source: "google_sheets",
-    raw: { statusRows: data.statusRows, rsoRows: data.rsoRows },
   };
 
   const chapters: Chapter[] = [];

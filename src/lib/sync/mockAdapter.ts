@@ -77,7 +77,6 @@ export function createMockAdapter(): SourceAdapter {
         statusCounts: { active: roster.length - 2, inactive: 0, pendingLaunch: 2 },
         rsoCounts: { recognized: roster.length - 1, pending: 1, notRecognized: 0, expired: 0 },
         source: "manual",
-        raw: {},
       };
     },
     async fetchSignups(): Promise<ChapterSignup[]> {
@@ -88,7 +87,6 @@ export function createMockAdapter(): SourceAdapter {
         submittedAt: String(row["Submitted At"]),
         status: String(row["Status"]),
         source: "manual",
-        raw: row,
       }));
     },
     async fetchEvents() {

@@ -127,7 +127,6 @@ async function persistChapters(chapters: Chapter[]) {
     charter_date: c.charterDate,
     term: c.term,
     source: c.source,
-    raw: c.raw,
   }));
 
   const { error } = await supabase.from("chapters").upsert(rows, { onConflict: "external_id" });
@@ -180,7 +179,6 @@ async function persistSignups(signups: ChapterSignup[]) {
     submitted_at: s.submittedAt,
     status: s.status,
     source: s.source,
-    raw: s.raw,
   }));
   const { error } = await supabase.from("chapter_signups").upsert(rows, { onConflict: "external_id" });
   if (error) throw new Error(`chapter_signups upsert failed: ${error.message}`);
@@ -197,7 +195,6 @@ async function persistEvents(events: ChapterEvent[]) {
     attendee_count: e.attendeeCount,
     volunteer_hours: e.volunteerHours,
     source: e.source,
-    raw: e.raw,
   }));
   const { error } = await supabase.from("chapter_events").upsert(rows, { onConflict: "external_id" });
   if (error) throw new Error(`chapter_events upsert failed: ${error.message}`);

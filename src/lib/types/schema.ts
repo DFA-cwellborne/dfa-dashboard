@@ -22,7 +22,6 @@ export interface Chapter {
   charterDate: string | null; // ISO date — when the chapter became officially active
   term: string | null; // e.g. "Fall 2026" — used for term-over-term retention
   source: DataSource;
-  raw: Record<string, unknown>; // original row, kept for debugging/audit
 }
 
 /**
@@ -46,7 +45,6 @@ export interface SheetSummary {
     expired: number | null;
   };
   source: DataSource;
-  raw: Record<string, unknown>;
 }
 
 /** A "start a chapter" intake submission, from the Airtable signups base. */
@@ -57,7 +55,6 @@ export interface ChapterSignup {
   submittedAt: string | null;
   status: string | null;
   source: DataSource;
-  raw: Record<string, unknown>;
 }
 
 export type EventType =
@@ -76,7 +73,6 @@ export interface ChapterEvent {
   attendeeCount: number | null;
   volunteerHours: number | null;
   source: DataSource;
-  raw: Record<string, unknown>;
 }
 
 export interface SyncResult {

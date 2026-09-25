@@ -1,5 +1,6 @@
 import { isSupabaseConfigured } from "@/config/publicEnv";
 import { getBrowserSupabase } from "@/lib/supabase/client";
+import { PUBLIC_COLUMNS } from "./columns";
 import type {
   ChapterEventRow,
   ChapterRow,
@@ -42,12 +43,12 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const [chaptersRes, snapshotsRes, eventsRes, signupsRes, summaryRes, syncLogRes] =
     await Promise.all([
-      supabase.from("chapters").select("*").order("name"),
-      supabase.from("chapter_snapshots").select("*").order("snapshot_date"),
-      supabase.from("chapter_events").select("*"),
-      supabase.from("chapter_signups").select("*").order("submitted_at"),
-      supabase.from("sheet_summary").select("*").eq("id", "default").maybeSingle(),
-      supabase.from("sync_log").select("*").order("created_at", { ascending: false }).limit(1),
+      supabase.from("chapters").select(PUBLIC_COLUMNS.chapters).order("name"),
+      supabase.from("chapter_snapshots").select(PUBLIC_COLUMNS.chapter_snapshots).order("snapshot_date"),
+      supabase.from("chapter_events").select(PUBLIC_COLUMNS.chapter_events),
+      supabase.from("chapter_signups").select(PUBLIC_COLUMNS.chapter_signups).order("submitted_at"),
+      supabase.from("sheet_summary").select(PUBLIC_COLUMNS.sheet_summary).eq("id", "default").maybeSingle(),
+      supabase.from("sync_log").select(PUBLIC_COLUMNS.sync_log).order("created_at", { ascending: false }).limit(1),
     ]);
 
   // A failed request must not masquerade as "no data" — with the background
@@ -79,7 +80,7 @@ export async function getSyncLogSummary(): Promise<SyncLogSummary> {
   const supabase = getBrowserSupabase();
   const { data, error } = await supabase
     .from("sync_log")
-    .select("*")
+    .select(PUBLIC_COLUMNS.sync_log)
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) throw new Error(`Supabase query failed: ${error.message}`);

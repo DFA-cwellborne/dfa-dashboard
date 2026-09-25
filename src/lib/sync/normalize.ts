@@ -57,7 +57,6 @@ export function chapterFromMasterListRow(row: unknown[]): Chapter | null {
     charterDate: null,
     term: null,
     source: "google_sheets",
-    raw: { row },
   };
 }
 
@@ -92,7 +91,6 @@ export function normalizeSignupRow(
     submittedAt: toIsoDateOrNull(getField(row, SIGNUP_FIELD_ALIASES.submittedAt)),
     status: toStringOrNull(getField(row, SIGNUP_FIELD_ALIASES.status)),
     source,
-    raw: row,
   };
 }
 
@@ -115,6 +113,5 @@ export function normalizeEventRow(
     attendeeCount: toNumberOrNull(getField(row, EVENT_FIELD_ALIASES.attendeeCount)),
     volunteerHours: toNumberOrNull(getField(row, EVENT_FIELD_ALIASES.volunteerHours)),
     source,
-    raw: row,
   };
 }

@@ -16,7 +16,6 @@ export type ChapterRow = {
   charter_date: string | null;
   term: string | null;
   source: string;
-  raw: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -40,7 +39,6 @@ export type ChapterEventRow = {
   attendee_count: number | null;
   volunteer_hours: number | null;
   source: string;
-  raw: Record<string, unknown>;
   created_at: string;
 }
 
@@ -67,7 +65,6 @@ export type ChapterSignupRow = {
   submitted_at: string | null;
   status: string | null;
   source: string;
-  raw: Record<string, unknown>;
   created_at: string;
 }
 

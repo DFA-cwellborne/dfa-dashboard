@@ -9,7 +9,7 @@ afterEach(cleanup);
 const chapter = (o: Partial<ChapterRow>): ChapterRow => ({
   id: o.external_id ?? "1", external_id: "c1", name: "Chapter", school_type: "College", status: "active",
   state: "TX", locale: null, member_count: 12, signup_date: null, charter_date: null, term: null,
-  source: "google_sheets", raw: {}, created_at: "", updated_at: "", ...o,
+  source: "google_sheets", created_at: "", updated_at: "", ...o,
 });
 
 const CHAPTERS: ChapterRow[] = [

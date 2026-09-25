@@ -27,7 +27,7 @@ const SYNC = {
 const DATA: DashboardData = {
   configured: true,
   chapters: [
-    { id: "1", external_id: "butler", name: "Butler University", school_type: "College", status: "active", state: "IN", locale: null, member_count: 9, signup_date: null, charter_date: null, term: null, source: "google_sheets", raw: {}, created_at: "", updated_at: "" },
+    { id: "1", external_id: "butler", name: "Butler University", school_type: "College", status: "active", state: "IN", locale: null, member_count: 9, signup_date: null, charter_date: null, term: null, source: "google_sheets", created_at: "", updated_at: "" },
   ],
   snapshots: [], events: [], signups: [],
   summary: { id: "default", total_chapters: 6, total_members: 9, active_chapters: 4, status_active: 4, status_inactive: 0, status_pending_launch: 2, rso_recognized: 5, rso_pending: 7, rso_not_recognized: 0, rso_expired: 0, synced_at: "" },

@@ -130,3 +130,43 @@ describe("normalizeEventRow", () => {
     expect(normalizeEventRow(event({ "Record ID": "" }), "airtable")).toBeNull();
   });
 });
+
+// Regression: the sync once stored every source row verbatim in a table the
+// public site could read — leaking presidents' and signups' names, emails and
+// phone numbers. Normalizers must only ever emit the fields the dashboard uses.
+describe("personal data never passes through normalization", () => {
+  const PII = ["zellgrady@gmail.com", "(612) 419-4776", "Zell Grady", "55401", "amccandless@school.org", "Anna McCandless"];
+  const leaked = (out: unknown) => PII.filter((p) => JSON.stringify(out).includes(p));
+
+  it("chapters", () => {
+    const c = chapterFromMasterListRow(["Minnetonka High School", "HS", "MN", "Zell Grady", "zellgrady@gmail.com", "(612) 419-4776", "", "", "Recognized", "Completed", "Active", "0"]);
+    expect(c).not.toBeNull();
+    expect(leaked(c)).toEqual([]);
+    expect(c).not.toHaveProperty("raw");
+  });
+
+  it("signups", () => {
+    const s = normalizeSignupRow(
+      {
+        "Record ID": "rec1", "Created Time": "2026-09-01T00:00:00.000Z", "First Name": "Abigail", "Last Name": "Smith",
+        Email: "amccandless@school.org", Phone: "(612) 419-4776", "Zip Code": "55401",
+        "School Name (No Abbreviations)": "Rice University", "How would you like to get involved?": ["Start a chapter"],
+      },
+      "airtable"
+    );
+    expect(s).not.toBeNull();
+    expect(leaked(s)).toEqual([]);
+    expect(JSON.stringify(s)).not.toMatch(/Abigail|Smith/);
+    expect(s).not.toHaveProperty("raw");
+  });
+
+  it("events", () => {
+    const e = normalizeEventRow(
+      { "Record ID": "e1", "Which school are you a part of": "Rice University", "What's your first and last name?": "Anna McCandless", Question: "amccandless@school.org" },
+      "airtable"
+    );
+    expect(e).not.toBeNull();
+    expect(leaked(e)).toEqual([]);
+    expect(e).not.toHaveProperty("raw");
+  });
+});

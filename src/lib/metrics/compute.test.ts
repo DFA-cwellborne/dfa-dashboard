@@ -22,7 +22,7 @@ import {
 const chapter = (o: Partial<ChapterRow> = {}): ChapterRow => ({
   id: "1", external_id: "c1", name: "C1", school_type: "College", status: "active", state: "TX",
   locale: null, member_count: 10, signup_date: null, charter_date: null, term: null,
-  source: "google_sheets", raw: {}, created_at: "", updated_at: "", ...o,
+  source: "google_sheets", created_at: "", updated_at: "", ...o,
 });
 
 const summary = (o: Partial<SheetSummaryRow> = {}): SheetSummaryRow => ({
@@ -37,7 +37,7 @@ const snapshot = (o: Partial<ChapterSnapshotRow>): ChapterSnapshotRow => ({
 
 const signup = (submitted_at: string | null): ChapterSignupRow => ({
   id: submitted_at ?? "x", external_id: submitted_at ?? "x", chapter_name: null, school_type: null,
-  submitted_at, status: null, source: "airtable", raw: {}, created_at: "",
+  submitted_at, status: null, source: "airtable", created_at: "",
 });
 
 afterEach(() => vi.useRealTimers());
@@ -189,7 +189,7 @@ describe("computeTimeToCharter", () => {
 describe("computeEventBreakdown", () => {
   const event = (event_type: ChapterEventRow["event_type"]): ChapterEventRow => ({
     id: "e", external_id: "e", chapter_external_id: "c1", event_type, event_date: null,
-    attendee_count: null, volunteer_hours: null, source: "airtable", raw: {}, created_at: "",
+    attendee_count: null, volunteer_hours: null, source: "airtable", created_at: "",
   });
 
   it("counts by type, keeps zero-count types, and files untyped events under 'other'", () => {
