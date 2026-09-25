@@ -98,6 +98,31 @@ must only import from `src/config/publicEnv.ts` instead.
    is hardcoded as `basePath` in `next.config.ts` since GitHub Pages project
    sites always live under `/<repo-name>/`.
 
+### Testing
+
+| Command | What it does |
+|---|---|
+| `npm test` | Unit + component tests (vitest). Hermetic — never touches real Supabase/Sheets/Airtable. |
+| `npm run lint` | ESLint. |
+| `npm run check:bundle` | After `npm run build`: fails if any real secret value appears in the public `out/` export. |
+| `npm run health` | Live check of the deployed system: Supabase reachable, data present, each sync source fresh and reliable, no credentials visible in the public sync log, site + assets load. |
+
+`deploy.yml` runs lint, tests, the build, and the bundle scan before every deploy, so a
+failing check leaves the currently-live site untouched.
+
+The tests deliberately encode past bugs (dropped first chapter, missing counts treated as
+zero, the API key that reached the public sync log, dashboard blanking on a failed refresh)
+so they can't come back. Rule of thumb: if a bug gets fixed, add the test that would have
+caught it.
+
+### The chapter map
+
+The Chapter Master List tracks each chapter's **state**, not its campus, so each dot sits at
+its state's center; chapters sharing a state fan out around it (stable order) instead of
+stacking. Chapters with a blank/unrecognized state (territories, typos) aren't drawn but are
+listed beside the map. Map shapes are `us-atlas` (pre-projected, so no runtime projection);
+see `src/lib/map/`. Exact campus pins would need a geocoding step at sync time.
+
 ### If the sheet layout changes
 
 Edit `HOME_SHEET_LAYOUT` or `CHAPTER_MASTER_LIST_LAYOUT` in

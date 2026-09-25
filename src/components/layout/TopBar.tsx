@@ -1,7 +1,8 @@
 import { clsx } from "clsx";
-import { RefreshCw, Settings } from "lucide-react";
+import { AlertTriangle, RefreshCw, Settings } from "lucide-react";
 import { format } from "date-fns";
 import { Logo } from "@/components/layout/Logo";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 import { SyncStatusIndicator } from "@/components/ui/SyncStatusIndicator";
 import type { SyncLogRow } from "@/lib/types/database";
 
@@ -9,13 +10,20 @@ export function TopBar({
   title,
   subtitle,
   latestSync,
+  lastCheckedAt,
+  refreshFailed,
   onOpenAdmin,
   onRefresh,
   refreshing,
 }: {
   title: string;
   subtitle?: string;
+  /** The most recent sync_log row — i.e. when the *source data* last synced. */
   latestSync: SyncLogRow | null;
+  /** ISO time this page last successfully re-read Supabase — distinct from the sync time. */
+  lastCheckedAt?: string | null;
+  /** The most recent refresh attempt failed (the data shown is from the last good one). */
+  refreshFailed?: boolean;
   onOpenAdmin?: () => void;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -29,12 +37,23 @@ export function TopBar({
           {subtitle ? <p className="text-sm text-navy/50">{subtitle}</p> : null}
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-navy/40">
-          {latestSync
-            ? `Data as of ${format(new Date(latestSync.finished_at), "MMM d, yyyy 'at' h:mm a")}`
-            : "No synced data yet"}
-        </span>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col items-end text-xs leading-tight">
+          <span className="text-navy/40" data-testid="data-as-of">
+            {latestSync
+              ? `Data synced ${format(new Date(latestSync.finished_at), "MMM d, yyyy 'at' h:mm a")}`
+              : "No synced data yet"}
+          </span>
+          {refreshFailed ? (
+            <span className="flex items-center gap-1 text-red" data-testid="refresh-status">
+              <AlertTriangle size={11} /> Couldn&apos;t refresh — showing last loaded data
+            </span>
+          ) : lastCheckedAt ? (
+            <span className="text-navy/40" data-testid="refresh-status">
+              Checked <RelativeTime date={lastCheckedAt} precise />
+            </span>
+          ) : null}
+        </div>
         <SyncStatusIndicator initialLatest={latestSync} />
         {onRefresh && (
           <button

@@ -12,6 +12,7 @@ import type {
 import { createAirtableAdapter } from "./airtableAdapter";
 import { createGoogleSheetsAdapter } from "./googleSheetsAdapter";
 import { createMockAdapter } from "./mockAdapter";
+import { redactSecrets } from "./redact";
 
 function mergeChapters(bySource: Map<DataSource, Chapter[]>): Chapter[] {
   // Only Google Sheets (or the mock adapter, standing in for it) provides a
@@ -32,20 +33,6 @@ interface AdapterRunOutcome {
   summary: SheetSummary | null;
   signups: ChapterSignup[];
   events: ChapterEvent[];
-}
-
-/**
- * sync_log is publicly readable (anon key, RLS-gated to SELECT only) so the
- * dashboard can show sync history to any visitor — but that means error
- * text stored here is also public. Google's client library (and any raw
- * HTTP error) can embed the full request URL, including an API-key query
- * param, in its error message. Strip anything that looks like a secret
- * before it's ever logged or persisted.
- */
-function redactSecrets(message: string): string {
-  return message
-    .replace(/([?&](?:key|api_key|apikey|token)=)[^&\s]+/gi, "$1[redacted]")
-    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]");
 }
 
 async function runAdapter(adapter: SourceAdapter): Promise<AdapterRunOutcome> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Users, Building2, CalendarCheck, TrendingUp, Clock, UserPlus } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { StatCard } from "@/components/ui/StatCard";
@@ -12,6 +12,7 @@ import { TrendLineChart } from "@/components/charts/TrendLineChart";
 import { RangeTrendChart } from "@/components/charts/RangeTrendChart";
 import { EventTypeBarChart } from "@/components/charts/EventTypeBarChart";
 import { ChaptersTable } from "@/components/chapters/ChaptersTable";
+import { ChapterMap } from "@/components/map/ChapterMap";
 import { AdminSyncPanel } from "@/components/admin/AdminSyncPanel";
 import { getDashboardData, getSyncLogSummary, type DashboardData, type SyncLogSummary } from "@/lib/data/queries";
 import {
@@ -43,6 +44,8 @@ function num(n: number | null) {
 const REFRESH_INTERVAL_MS = 20_000;
 
 const METRIC_INFO = {
+  chapterMap:
+    "One dot per chapter on the Chapter Master List, placed by its state. The sheet tracks state, not campus, so chapters in the same state fan out around the state's center rather than sitting at exact campus locations. New chapters appear automatically after the next sync.",
   activeChapters:
     "Chapters currently Active or Pending Launch, from the Chapter Master List tab in Google Sheets. “Total” includes inactive chapters too.",
   totalMembers:
@@ -66,50 +69,60 @@ const METRIC_INFO = {
     "One row per chapter from the Chapter Master List tab in Google Sheets — name, school type, state, status, and member count.",
 } as const;
 
+// A manual refresh usually finishes in well under a second — too fast to see
+// the spinner, which reads as "nothing happened". Hold it briefly.
+const MIN_SPINNER_MS = 700;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function Overview() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [syncLog, setSyncLog] = useState<SyncLogSummary | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // When this page last successfully re-read Supabase. Distinct from the sync
+  // time: syncs only land every 20 minutes, so without this a refresh that
+  // found nothing new looked identical to a refresh that never happened.
+  const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [d, s] = await Promise.all([getDashboardData(), getSyncLogSummary()]);
+      setData(d);
+      setSyncLog(s);
+      setLastCheckedAt(new Date().toISOString());
+      setRefreshFailed(false);
+    } catch {
+      // Keep whatever we last loaded on screen rather than blanking it.
+      setRefreshFailed(true);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load(showSpinner: boolean) {
-      if (showSpinner) setRefreshing(true);
-      const [d, s] = await Promise.all([getDashboardData(), getSyncLogSummary()]);
-      if (!cancelled) {
-        setData(d);
-        setSyncLog(s);
-      }
-      if (showSpinner) setRefreshing(false);
-    }
-
-    load(false);
-    const interval = setInterval(() => load(false), REFRESH_INTERVAL_MS);
+    const first = setTimeout(load, 0);
+    const interval = setInterval(load, REFRESH_INTERVAL_MS);
 
     // Refetch when the tab regains focus/visibility — catches up on syncs
     // that landed while this tab was backgrounded, without waiting for the
     // interval.
     function onVisible() {
-      if (document.visibilityState === "visible") load(false);
+      if (document.visibilityState === "visible") load();
     }
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
 
     return () => {
-      cancelled = true;
+      clearTimeout(first);
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, []);
+  }, [load]);
 
   async function handleManualRefresh() {
     setRefreshing(true);
-    const [d, s] = await Promise.all([getDashboardData(), getSyncLogSummary()]);
-    setData(d);
-    setSyncLog(s);
+    await Promise.all([load(), sleep(MIN_SPINNER_MS)]);
     setRefreshing(false);
   }
 
@@ -118,7 +131,22 @@ export function Overview() {
       <>
         <TopBar title="National Overview" latestSync={null} />
         <main className="flex-1 space-y-6 p-6">
-          <div className="animate-pulse text-sm text-navy/40">Loading…</div>
+          {refreshFailed ? (
+            <Card className="max-w-md">
+              <h2 className="text-lg font-semibold text-navy">Couldn&apos;t load the dashboard</h2>
+              <p className="mt-2 text-sm text-navy/70">
+                The data service didn&apos;t respond. Check your connection and try again.
+              </p>
+              <button
+                onClick={handleManualRefresh}
+                className="mt-4 rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              >
+                Retry
+              </button>
+            </Card>
+          ) : (
+            <div className="animate-pulse text-sm text-navy/40">Loading…</div>
+          )}
         </main>
       </>
     );
@@ -153,11 +181,15 @@ export function Overview() {
         title="National Overview"
         subtitle="Across all reporting DFA chapters"
         latestSync={data.latestSync}
+        lastCheckedAt={lastCheckedAt}
+        refreshFailed={refreshFailed}
         onOpenAdmin={() => setAdminOpen(true)}
         onRefresh={handleManualRefresh}
         refreshing={refreshing}
       />
       <main className="flex-1 space-y-8 p-6">
+        <ChapterMap chapters={data.chapters} info={METRIC_INFO.chapterMap} />
+
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Active Chapters"

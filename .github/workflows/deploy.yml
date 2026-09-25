@@ -24,10 +24,23 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Gate the deploy: a failing lint/test/typecheck stops here and the
+      # currently-live site stays exactly as it is.
+      - run: npm run lint
+      - run: npm test
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      # The site is public, so anything in out/ is public. Fail the deploy if a
+      # real secret value ended up in it.
+      - run: npm run check:bundle
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
+          GOOGLE_SHEETS_API_KEY: ${{ secrets.GOOGLE_SHEETS_API_KEY }}
+          GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          BREAKTHRU_API_KEY: ${{ secrets.BREAKTHRU_API_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

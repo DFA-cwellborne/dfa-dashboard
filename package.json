@@ -8,30 +8,44 @@
     "start": "next start",
     "lint": "eslint",
     "seed:mock": "tsx scripts/seed-mock.ts",
-    "sync:run": "tsx scripts/run-sync.ts"
+    "sync:run": "tsx scripts/run-sync.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:bundle": "tsx scripts/check-bundle-secrets.ts",
+    "health": "tsx --env-file-if-exists=.env.local scripts/health-check.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "airtable": "^0.12.2",
     "clsx": "^2.1.1",
+    "d3-geo": "^3.1.1",
     "date-fns": "^4.4.0",
     "googleapis": "^180.0.0",
     "lucide-react": "^1.45.0",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "topojson-client": "^3.1.0",
+    "us-atlas": "^3.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/d3-geo": "^3.1.1",
+    "@types/node": "^22.20.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/topojson-client": "^3.1.5",
+    "@types/topojson-specification": "^1.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.2"
   }
 }

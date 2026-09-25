@@ -50,6 +50,14 @@ export async function getDashboardData(): Promise<DashboardData> {
       supabase.from("sync_log").select("*").order("created_at", { ascending: false }).limit(1),
     ]);
 
+  // A failed request must not masquerade as "no data" — with the background
+  // refresh, one dropped request would otherwise blank the whole dashboard.
+  // Throw so the caller can keep showing the last good data instead.
+  const failed = [chaptersRes, snapshotsRes, eventsRes, signupsRes, summaryRes, syncLogRes].find(
+    (r) => r.error
+  );
+  if (failed?.error) throw new Error(`Supabase query failed: ${failed.error.message}`);
+
   return {
     configured: true,
     chapters: chaptersRes.data ?? [],
@@ -69,11 +77,12 @@ export interface SyncLogSummary {
 export async function getSyncLogSummary(): Promise<SyncLogSummary> {
   if (!isSupabaseConfigured()) return { bySource: {}, recent: [] };
   const supabase = getBrowserSupabase();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("sync_log")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(50);
+  if (error) throw new Error(`Supabase query failed: ${error.message}`);
 
   const recent = data ?? [];
   const bySource: Record<string, SyncLogRow | undefined> = {};
