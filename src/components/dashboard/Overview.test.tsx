@@ -47,7 +47,7 @@ afterEach(() => {
 
 const status = () => screen.getByTestId("refresh-status").textContent ?? "";
 const refreshButton = () => screen.getByRole("button", { name: "Refresh data" }) as HTMLButtonElement;
-const checkedAt = () => status().replace("Checked ", "");
+const checkedAt = () => status().match(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/)?.[0] ?? "";
 
 describe("Overview", () => {
   it("loads from Supabase on mount and renders the dashboard", async () => {
@@ -113,7 +113,7 @@ describe("Overview", () => {
       fireEvent.click(tab("Map"));
       await screen.findByText("Chapter Map");
       expect(screen.getByRole("button", { name: "Refresh data" })).toBeTruthy();
-      expect(status()).toMatch(/^Checked /);
+      expect(status()).toMatch(/^Page checked /);
     });
 
     it("can be driven from the keyboard with the arrow keys", async () => {
@@ -127,8 +127,8 @@ describe("Overview", () => {
   it("shows both when data last synced and when this page last checked", async () => {
     render(<Overview />);
     await screen.findByText("Active Chapters");
-    expect(screen.getByTestId("data-as-of").textContent).toMatch(/^Data synced Sep 25, 2026/);
-    expect(status()).toMatch(/^Checked \d{4}-\d{2}-\d{2}T/);
+    expect(screen.getByTestId("data-as-of").textContent).toMatch(/^Last synced: Sep 25, 2026/);
+    expect(status()).toMatch(/^Page checked \d{4}-\d{2}-\d{2}T/);
   });
 
   it("clicking refresh re-queries AND visibly updates the 'Checked' time — even when nothing new synced", async () => {
@@ -149,7 +149,7 @@ describe("Overview", () => {
     expect(after).not.toBe(before);
     expect(new Date(after).getTime()).toBeGreaterThan(new Date(before).getTime());
     // The sync time is unchanged — that's the sync job's, not the page's.
-    expect(screen.getByTestId("data-as-of").textContent).toMatch(/^Data synced Sep 25, 2026/);
+    expect(screen.getByTestId("data-as-of").textContent).toMatch(/^Last synced: Sep 25, 2026/);
   });
 
   it("re-checks when the tab regains focus", async () => {
@@ -184,7 +184,7 @@ describe("Overview", () => {
     await waitFor(() => expect(refreshButton().disabled).toBe(false), { timeout: 3000 });
 
     fireEvent.click(refreshButton());
-    await waitFor(() => expect(status()).toMatch(/^Checked /), { timeout: 3000 });
+    await waitFor(() => expect(status()).toMatch(/^Page checked /), { timeout: 3000 });
   });
 
   it("shows an error with Retry — not an endless 'Loading…' — if the very first load fails", async () => {
@@ -200,6 +200,18 @@ describe("Overview", () => {
     mockData.mockResolvedValue({ ...DATA, configured: false });
     render(<Overview />);
     expect(await screen.findByText("Connect Supabase to see data")).toBeTruthy();
+  });
+
+  it("explains that 'Page checked' and 'Data synced' are different things — regression: this looked like a bug", async () => {
+    render(<Overview />);
+    await screen.findByText("Active Chapters");
+    // Both labels are distinct and visible (not just one overloaded "Synced" label)...
+    expect(screen.getByTestId("data-as-of").textContent).toMatch(/^Last synced:/);
+    expect(status()).toMatch(/^Page checked/);
+    // ...and each has wording nearby (in the DOM, via a hover tooltip) saying why they
+    // can legitimately show different times, so it doesn't read as broken.
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText).toMatch(/synced.*20 minutes/i);
   });
 
   it("opens the sync settings modal from the gear button", async () => {

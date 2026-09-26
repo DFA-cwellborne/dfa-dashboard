@@ -2,6 +2,7 @@ import { clsx } from "clsx";
 import { AlertTriangle, RefreshCw, Settings } from "lucide-react";
 import { format } from "date-fns";
 import { Logo } from "@/components/layout/Logo";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { SyncStatusIndicator } from "@/components/ui/SyncStatusIndicator";
 import type { SyncLogRow } from "@/lib/types/database";
@@ -41,7 +42,7 @@ export function TopBar({
         <div className="flex flex-col items-end text-xs leading-tight">
           <span className="text-navy/40" data-testid="data-as-of">
             {latestSync
-              ? `Data synced ${format(new Date(latestSync.finished_at), "MMM d, yyyy 'at' h:mm a")}`
+              ? `Last synced: ${format(new Date(latestSync.finished_at), "MMM d, yyyy 'at' h:mm a")}`
               : "No synced data yet"}
           </span>
           {refreshFailed ? (
@@ -49,8 +50,9 @@ export function TopBar({
               <AlertTriangle size={11} /> Couldn&apos;t refresh — showing last loaded data
             </span>
           ) : lastCheckedAt ? (
-            <span className="text-navy/40" data-testid="refresh-status">
-              Checked <RelativeTime date={lastCheckedAt} precise />
+            <span className="flex items-center gap-1 text-navy/40" data-testid="refresh-status">
+              Page checked <RelativeTime date={lastCheckedAt} precise />
+              <InfoTooltip text="This is when your browser last re-read the synced data — it's instant, but it only shows what's already synced. New chapter/event data itself arrives automatically about every 20 minutes; clicking refresh can't make that happen sooner." />
             </span>
           ) : null}
         </div>

@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/config/publicEnv";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { SyncLogRow } from "@/lib/types/database";
 import { RelativeTime } from "./RelativeTime";
+import { InfoTooltip } from "./InfoTooltip";
 
 export interface SyncStatusIndicatorProps {
   initialLatest: SyncLogRow | null;
@@ -52,7 +53,7 @@ export function SyncStatusIndicator({ initialLatest }: SyncStatusIndicatorProps)
   const ok = latest?.success ?? null;
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-navy/10 bg-white px-3 py-1.5 text-xs font-medium text-navy/70">
+    <div className="flex items-center gap-1.5 rounded-full border border-navy/10 bg-white px-3 py-1.5 text-xs font-medium text-navy/70">
       <span
         className={clsx(
           "h-2.5 w-2.5 rounded-full",
@@ -61,13 +62,14 @@ export function SyncStatusIndicator({ initialLatest }: SyncStatusIndicatorProps)
           ok === null && "bg-navy/20"
         )}
       />
-      {ok === null && "No sync yet"}
+      {ok === null && "No data synced yet"}
       {ok === true && latest && (
         <span>
-          Synced <RelativeTime date={latest.finished_at} />
+          Data synced <RelativeTime date={latest.finished_at} />
         </span>
       )}
       {ok === false && <span>Sync error — see Admin</span>}
+      <InfoTooltip text="Chapters, members, and events sync in automatically from Google Sheets and Airtable roughly every 20 minutes. This is how old that synced data is — it's separate from the page's own refresh, which just re-reads whatever was synced most recently." />
     </div>
   );
 }
