@@ -8,6 +8,8 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # A job that never starts its steps (runner stall) otherwise sits for 15+ minutes.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,7 +17,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run sync:run
+      # Retry transient failures (network blips, runner hiccups) before reporting a failure.
+      - name: Sync (with retries)
+        run: |
+          for attempt in 1 2 3; do
+            npm run sync:run && exit 0
+            echo "sync attempt $attempt failed"
+            sleep 30
+          done
+          exit 1
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
