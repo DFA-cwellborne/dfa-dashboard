@@ -56,7 +56,7 @@ const METRIC_INFO = {
     "Events submitted through the chapters' Airtable event planning form, counted as soon as they're filed. \u201cHeld\u201d means the planned date is today or earlier; \u201cupcoming\u201d means it's still ahead.",
   chapterSignups:
     "“Start a chapter” submissions from the Airtable intake form, filtered to responses that specifically asked to start or join a chapter.",
-  chapterStatus: "Active / Inactive / Pending Launch counts, read directly from the Google Sheets Home tab's status table.",
+  chapterStatus: "Active / Inactive / Pending Launch counts, from each chapter's status on the Chapter Master List tab in Google Sheets.",
   rsoStatus: "Recognized / Pending / Not Recognized / Expired counts, read directly from the Google Sheets Home tab's RSO table.",
   chaptersTrend: "Number of chapters on the roster, snapshotted once per sync so you can see it change over time.",
   membersTrend: "Total members across all chapters, snapshotted once per sync so you can see it change over time.",
