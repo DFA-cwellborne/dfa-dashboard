@@ -112,8 +112,12 @@ describe("computeMembershipStats", () => {
 });
 
 describe("status / RSO breakdowns", () => {
-  it("reads status counts from the summary when present", () => {
-    expect(computeStatusBreakdown([], summary())).toEqual({ active: 4, inactive: 0, pendingLaunch: 2 });
+  it("counts the roster even when a summary is also present — regression: the Home tab's Status-table formula counted a duplicate chapter row that the roster itself had already deduped, so the two disagreed (hero card: 11 total; breakdown card: 10+1+1=12)", () => {
+    const b = computeStatusBreakdown(
+      [chapter({ status: "active" }), chapter({ external_id: "c2", status: "inactive" })],
+      summary({ status_active: 10, status_inactive: 1, status_pending_launch: 1 }) // stale/mismatched, must be ignored
+    );
+    expect(b).toEqual({ active: 1, inactive: 1, pendingLaunch: 0 });
   });
 
   it("counts the roster when there's no summary", () => {
@@ -122,6 +126,14 @@ describe("status / RSO breakdowns", () => {
       null
     );
     expect(b).toEqual({ active: 1, inactive: 0, pendingLaunch: 2 });
+  });
+
+  it("falls back to the summary only when the roster is empty (a sync gap)", () => {
+    expect(computeStatusBreakdown([], summary())).toEqual({ active: 4, inactive: 0, pendingLaunch: 2 });
+  });
+
+  it("is null (no data), not zero, when both the roster and the summary are empty", () => {
+    expect(computeStatusBreakdown([], null)).toEqual({ active: null, inactive: null, pendingLaunch: null });
   });
 
   it("RSO breakdown is null (no data) without a summary, and passes real values through", () => {

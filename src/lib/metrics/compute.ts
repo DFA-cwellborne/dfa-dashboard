@@ -68,17 +68,22 @@ export function computeStatusBreakdown(
   chapters: ChapterRow[],
   summary?: SheetSummaryRow | null
 ): StatusBreakdown {
-  if (summary) {
+  // Same reasoning as computeChapterCounts: count the roster, not the Home
+  // tab's own Status-table formula — that formula counts raw sheet rows,
+  // which can disagree with the (deduped) roster (observed: a chapter
+  // listed twice under two statuses made the table's counts not sum to the
+  // real chapter total). Falls back to the formula only if the roster is empty.
+  if (chapters.length) {
     return {
-      active: summary.status_active,
-      inactive: summary.status_inactive,
-      pendingLaunch: summary.status_pending_launch,
+      active: chapters.filter((c) => c.status === "active").length,
+      inactive: chapters.filter((c) => c.status === "inactive").length,
+      pendingLaunch: chapters.filter((c) => c.status === "pending_launch").length,
     };
   }
   return {
-    active: chapters.filter((c) => c.status === "active").length,
-    inactive: chapters.filter((c) => c.status === "inactive").length,
-    pendingLaunch: chapters.filter((c) => c.status === "pending_launch").length,
+    active: summary?.status_active ?? null,
+    inactive: summary?.status_inactive ?? null,
+    pendingLaunch: summary?.status_pending_launch ?? null,
   };
 }
 
