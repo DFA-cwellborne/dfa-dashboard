@@ -115,3 +115,29 @@ export function normalizeEventRow(
     source,
   };
 }
+
+/**
+ * Two rows with the same chapter name collide: both map to the same
+ * slugified externalId, so the second silently overwrites the first in
+ * storage, with no guarantee about which one wins (depends on fetch/row
+ * order). Observed in practice — a chapter listed twice on the Master List
+ * with two different statuses. Keep the first occurrence (top-to-bottom
+ * sheet order) deterministically, and report the rest as duplicates so the
+ * sync can warn about them instead of silently dropping data.
+ */
+export function dedupeChapters(chapters: Chapter[]): { chapters: Chapter[]; duplicates: string[] } {
+  const seen = new Set<string>();
+  const deduped: Chapter[] = [];
+  const duplicates: string[] = [];
+
+  for (const chapter of chapters) {
+    if (seen.has(chapter.externalId)) {
+      duplicates.push(chapter.name);
+      continue;
+    }
+    seen.add(chapter.externalId);
+    deduped.push(chapter);
+  }
+
+  return { chapters: deduped, duplicates };
+}

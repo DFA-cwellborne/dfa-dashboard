@@ -7,7 +7,7 @@ import {
   STATUS_LABEL_MAP,
 } from "@/config/sheetMapping";
 import type { Chapter, SheetSummary, SourceAdapter } from "@/lib/types/schema";
-import { chapterFromMasterListRow } from "./normalize";
+import { chapterFromMasterListRow, dedupeChapters } from "./normalize";
 
 /**
  * Reads the DFA chapter "Home" dashboard sheet. Unlike a normal data table,
@@ -126,12 +126,19 @@ export function parseHomeSheet(data: Awaited<ReturnType<typeof fetchHomeRanges>>
     source: "google_sheets",
   };
 
-  const chapters: Chapter[] = [];
+  const rawChapters: Chapter[] = [];
   // First row of the range is the header row — skip it. The row after that
   // is a "[SCHOOL]" template row, filtered out inside chapterFromMasterListRow.
   for (const row of data.masterListRows.slice(1)) {
     const chapter = chapterFromMasterListRow(row ?? []);
-    if (chapter) chapters.push(chapter);
+    if (chapter) rawChapters.push(chapter);
+  }
+
+  const { chapters, duplicates } = dedupeChapters(rawChapters);
+  if (duplicates.length) {
+    console.warn(
+      `[google_sheets] Chapter Master List has ${duplicates.length} duplicate chapter name(s) — only the first row for each was kept, the rest were ignored: ${duplicates.join(", ")}. Fix the duplicate row(s) in the sheet.`
+    );
   }
 
   return { summary, chapters };

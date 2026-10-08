@@ -33,11 +33,14 @@ export interface ChapterCounts {
 }
 
 /**
- * Prefers the Google Sheets "Home" tab's own aggregate totals (in
- * `summary`) when available — the sheet's roster only has name+members per
- * row, so per-chapter status isn't derivable; the sheet's pre-computed
- * counts are the more accurate source. Falls back to counting the roster
- * once real per-chapter status exists.
+ * Counts directly from the per-chapter roster (sourced from the Chapter
+ * Master List tab, which carries real per-chapter status) rather than the
+ * Home tab's headline total/active cells. Those headline cells are
+ * hand-maintained separately from the roster and have been observed to go
+ * stale — e.g. stuck at "4 active" while the roster and the Home tab's own
+ * Status table both agreed on a different number. Falls back to the
+ * headline cells only if the roster came back empty (a sync gap), so a
+ * transient fetch issue doesn't zero out the dashboard.
  */
 export function computeChapterCounts(
   chapters: ChapterRow[],
@@ -45,8 +48,8 @@ export function computeChapterCounts(
 ): ChapterCounts {
   const active = chapters.filter((c) => c.status === "active");
   return {
-    total: summary?.total_chapters ?? chapters.length,
-    active: summary?.active_chapters ?? active.length,
+    total: chapters.length || (summary?.total_chapters ?? 0),
+    active: chapters.length ? active.length : (summary?.active_chapters ?? 0),
     hs: chapters.filter((c) => c.school_type === "HS").length,
     college: chapters.filter((c) => c.school_type === "College").length,
     activeHs: active.filter((c) => c.school_type === "HS").length,
@@ -111,7 +114,12 @@ export function computeMembershipStats(
 ): MembershipStats {
   const active = chapters.filter((c) => c.status === "active");
   return {
-    totalMembers: summary?.total_members ?? sumExcludingNulls(active.map((c) => c.member_count)),
+    // Same reasoning as computeChapterCounts: the roster is the reliable
+    // source, the Home tab's headline total is a hand-maintained cell that
+    // can drift from it.
+    totalMembers: chapters.length
+      ? sumExcludingNulls(active.map((c) => c.member_count))
+      : (summary?.total_members ?? 0),
     avgPerChapter: avgExcludingNulls(active.map((c) => c.member_count)),
     avgPerChapterHs: avgExcludingNulls(
       active.filter((c) => c.school_type === "HS").map((c) => c.member_count)

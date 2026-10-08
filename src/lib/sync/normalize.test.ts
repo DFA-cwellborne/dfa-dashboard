@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { slugifyName } from "@/lib/types/schema";
-import { chapterFromMasterListRow, normalizeEventRow, normalizeSignupRow } from "./normalize";
+import { chapterFromMasterListRow, dedupeChapters, normalizeEventRow, normalizeSignupRow } from "./normalize";
 
 // Column order of the "Chapter Master List" tab:
 // School, C/H, State, Pres name, email, phone, Breakthru, Membership sheet,
@@ -199,5 +199,47 @@ describe("personal data never passes through normalization", () => {
     expect(e).not.toBeNull();
     expect(leaked(e)).toEqual([]);
     expect(e).not.toHaveProperty("raw");
+  });
+});
+
+describe("dedupeChapters", () => {
+  const c = (name: string, extra: Partial<ReturnType<typeof chapterFromMasterListRow>> = {}) =>
+    ({ ...chapterFromMasterListRow(["", "C", "TX", "", "", "", "", "", "", "", "Active", "0"])!, name, externalId: name.toLowerCase().replace(/\s+/g, "-"), ...extra }) as NonNullable<ReturnType<typeof chapterFromMasterListRow>>;
+
+  it("keeps a chapter listed once", () => {
+    const { chapters, duplicates } = dedupeChapters([c("Rice University")]);
+    expect(chapters).toHaveLength(1);
+    expect(duplicates).toEqual([]);
+  });
+
+  it("regression: two rows with the same name collided silently, with the winner depending on fetch order — now the first (top-to-bottom sheet order) always wins", () => {
+    const first = c("Minnetonka High School", { status: "active" });
+    const second = c("Minnetonka High School", { status: "pending_launch" });
+    const { chapters, duplicates } = dedupeChapters([first, second]);
+    expect(chapters).toEqual([first]);
+    expect(duplicates).toEqual(["Minnetonka High School"]);
+  });
+
+  it("is stable regardless of which duplicate appears first — always keeps whichever is literally first in the input", () => {
+    const first = c("Minnetonka High School", { status: "pending_launch" });
+    const second = c("Minnetonka High School", { status: "active" });
+    expect(dedupeChapters([first, second]).chapters[0].status).toBe("pending_launch");
+    expect(dedupeChapters([second, first]).chapters[0].status).toBe("active");
+  });
+
+  it("reports every duplicate past the first, for 3+ copies of the same chapter", () => {
+    const { chapters, duplicates } = dedupeChapters([c("X"), c("X"), c("X")]);
+    expect(chapters).toHaveLength(1);
+    expect(duplicates).toEqual(["X", "X"]);
+  });
+
+  it("doesn't confuse two different chapters, or flag unrelated chapters as duplicates", () => {
+    const { chapters, duplicates } = dedupeChapters([c("Rice University"), c("Butler University")]);
+    expect(chapters).toHaveLength(2);
+    expect(duplicates).toEqual([]);
+  });
+
+  it("handles an empty list", () => {
+    expect(dedupeChapters([])).toEqual({ chapters: [], duplicates: [] });
   });
 });

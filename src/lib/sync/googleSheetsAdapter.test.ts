@@ -64,6 +64,24 @@ describe("parseHomeSheet", () => {
     expect(chapters.some((c) => c.name === "School / Region" || c.name === "[SCHOOL]" || c.name === "")).toBe(false);
   });
 
+  it("regression: a duplicate chapter row (e.g. the same school listed twice with different statuses) is deduped, not silently dropped by whichever upsert ran last", () => {
+    const { chapters, summary } = parseHomeSheet(
+      fixture({
+        masterListRows: [
+          HEADER,
+          TEMPLATE,
+          ["Minnetonka High School", "HS", "MN", "", "", "", "", "", "Recognized", "Completed", "Active", "5"],
+          ["University of Oklahoma", "C", "OK", "", "", "", "", "", "Recognized", "Completed", "Active", "0"],
+          ["Minnetonka High School", "HS", "MN", "", "", "", "", "", "Recognized", "Completed", "Pending Launch", "0"],
+        ],
+      })
+    );
+    expect(chapters.map((c) => c.name)).toEqual(["Minnetonka High School", "University of Oklahoma"]);
+    // First occurrence (sheet order) wins, deterministically — not "whichever synced last".
+    expect(chapters.find((c) => c.name === "Minnetonka High School")!.status).toBe("active");
+    expect(summary).toBeTruthy(); // the summary/status tables are unaffected by the chapter-row dedup
+  });
+
   it("carries type/state/status through to each chapter", () => {
     const { chapters } = parseHomeSheet(fixture());
     expect(chapters[0]).toMatchObject({ schoolType: "College", state: "OK", status: "active" });

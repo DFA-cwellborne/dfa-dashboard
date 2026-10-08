@@ -43,10 +43,23 @@ const signup = (submitted_at: string | null): ChapterSignupRow => ({
 afterEach(() => vi.useRealTimers());
 
 describe("computeChapterCounts", () => {
-  it("prefers the sheet's own aggregate totals over counting the roster", () => {
-    const c = computeChapterCounts([chapter()], summary());
+  it("counts the real roster rather than the Home tab's headline cells — those drift stale (e.g. stuck at \"4 active\" while the roster and the sheet's own Status table both said otherwise)", () => {
+    const c = computeChapterCounts(
+      [chapter({ status: "active" }), chapter({ external_id: "c2", status: "active" }), chapter({ external_id: "c3", status: "inactive" })],
+      summary({ total_chapters: 6, active_chapters: 4 }) // deliberately wrong/stale, must be ignored
+    );
+    expect(c.total).toBe(3);
+    expect(c.active).toBe(2);
+  });
+
+  it("falls back to the sheet's headline totals only when the roster came back empty (a sync gap)", () => {
+    const c = computeChapterCounts([], summary({ total_chapters: 6, active_chapters: 4 }));
     expect(c.total).toBe(6);
     expect(c.active).toBe(4);
+  });
+
+  it("is zero, not a crash, with no roster and no summary", () => {
+    expect(computeChapterCounts([], null)).toMatchObject({ total: 0, active: 0 });
   });
 
   it("falls back to counting the roster when there's no summary", () => {
@@ -85,8 +98,16 @@ describe("computeMembershipStats", () => {
     expect(computeMembershipStats([], null).avgPerChapter).toBeNull();
   });
 
-  it("uses the sheet's total when provided", () => {
-    expect(computeMembershipStats([chapter()], summary({ total_members: 1400 })).totalMembers).toBe(1400);
+  it("sums the real roster rather than the Home tab's headline member total, which can drift stale the same way the chapter counts do", () => {
+    const m = computeMembershipStats(
+      [chapter({ member_count: 5 }), chapter({ external_id: "c2", member_count: 7 })],
+      summary({ total_members: 1400 }) // deliberately wrong/stale, must be ignored
+    );
+    expect(m.totalMembers).toBe(12);
+  });
+
+  it("falls back to the sheet's headline member total only when the roster came back empty", () => {
+    expect(computeMembershipStats([], summary({ total_members: 1400 })).totalMembers).toBe(1400);
   });
 });
 
