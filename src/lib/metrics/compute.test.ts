@@ -4,11 +4,15 @@ import type {
   ChapterRow,
   ChapterSignupRow,
   ChapterSnapshotRow,
+  PublicMapChapterRow,
+  PublicMapSnapshotRow,
   SheetSummaryRow,
 } from "@/lib/types/database";
 import {
   computeChapterCounts,
   computeEventBreakdown,
+  computeGoalProgress,
+  computeGoalTrend,
   computeMembershipStats,
   computeRetention,
   computeRsoBreakdown,
@@ -38,6 +42,15 @@ const snapshot = (o: Partial<ChapterSnapshotRow>): ChapterSnapshotRow => ({
 const signup = (submitted_at: string | null): ChapterSignupRow => ({
   id: submitted_at ?? "x", external_id: submitted_at ?? "x", chapter_name: null, school_type: null,
   submitted_at, status: null, source: "airtable", created_at: "",
+});
+
+const mapChapter = (id: string): PublicMapChapterRow => ({
+  external_id: id, school: id, type: "College", state: "TX", city: "Houston", lat: 29.7, lng: -95.4,
+  status: "active", president: null, link: null, source: "public_map", created_at: "", updated_at: "",
+});
+
+const mapSnapshot = (o: Partial<PublicMapSnapshotRow>): PublicMapSnapshotRow => ({
+  id: "s", snapshot_date: "2026-09-01", active_count: 0, launching_count: 0, created_at: "", ...o,
 });
 
 afterEach(() => vi.useRealTimers());
@@ -258,5 +271,72 @@ describe("computeEventBreakdown", () => {
 
   it("is empty with no events", () => {
     expect(computeEventBreakdown([], TODAY)).toEqual({ total: 0, held: 0, upcoming: 0, undated: 0, byType: [] });
+  });
+});
+
+describe("computeGoalProgress", () => {
+  const GOALS = [
+    { label: "End of 2026", target: 50, deadline: "2026-12-31" },
+    { label: "End of 2027", target: 250, deadline: "2027-12-31" },
+  ];
+
+  it("counts every public-map chapter — the table only has active/launching rows, so a row count already is 'active + pipeline'", () => {
+    const chapters = [mapChapter("a"), mapChapter("b"), mapChapter("c")];
+    const [first] = computeGoalProgress(chapters, "2026-01-01", GOALS);
+    expect(first.current).toBe(3);
+  });
+
+  it("computes pct toward target and days remaining to the deadline", () => {
+    const chapters = Array.from({ length: 25 }, (_, i) => mapChapter(`c${i}`));
+    const [first] = computeGoalProgress(chapters, "2026-12-01", GOALS);
+    expect(first.pct).toBe(0.5);
+    expect(first.met).toBe(false);
+    expect(first.daysRemaining).toBe(30);
+    expect(first.deadlinePassed).toBe(false);
+  });
+
+  it("clamps pct at 1 when the goal is already exceeded, and flags it met", () => {
+    const chapters = Array.from({ length: 60 }, (_, i) => mapChapter(`c${i}`));
+    const [first] = computeGoalProgress(chapters, "2026-01-01", GOALS);
+    expect(first.pct).toBe(1);
+    expect(first.met).toBe(true);
+  });
+
+  it("clamps daysRemaining at 0 and flags deadlinePassed once the deadline is behind us, instead of going negative", () => {
+    const chapters = [mapChapter("a")];
+    const [first] = computeGoalProgress(chapters, "2027-03-01", GOALS);
+    expect(first.daysRemaining).toBe(0);
+    expect(first.deadlinePassed).toBe(true);
+  });
+
+  it("treats the deadline date itself as not yet passed", () => {
+    const [first] = computeGoalProgress([mapChapter("a")], "2026-12-31", GOALS);
+    expect(first.deadlinePassed).toBe(false);
+    expect(first.daysRemaining).toBe(0);
+  });
+
+  it("returns one entry per goal, independent of each other", () => {
+    const chapters = Array.from({ length: 50 }, (_, i) => mapChapter(`c${i}`));
+    const progress = computeGoalProgress(chapters, "2026-01-01", GOALS);
+    expect(progress).toHaveLength(2);
+    expect(progress[0]).toMatchObject({ label: "End of 2026", target: 50, met: true });
+    expect(progress[1]).toMatchObject({ label: "End of 2027", target: 250, met: false });
+  });
+});
+
+describe("computeGoalTrend", () => {
+  it("sums active + launching per day and sorts chronologically", () => {
+    const trend = computeGoalTrend([
+      mapSnapshot({ snapshot_date: "2026-09-03", active_count: 10, launching_count: 20 }),
+      mapSnapshot({ snapshot_date: "2026-09-01", active_count: 5, launching_count: 8 }),
+    ]);
+    expect(trend).toEqual([
+      { date: "2026-09-01", value: 13 },
+      { date: "2026-09-03", value: 30 },
+    ]);
+  });
+
+  it("is empty with no snapshots", () => {
+    expect(computeGoalTrend([])).toEqual([]);
   });
 });

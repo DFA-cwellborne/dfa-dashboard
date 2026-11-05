@@ -35,6 +35,9 @@ const DATA: DashboardData = {
   publicMapChapters: [
     { external_id: "butler-university", school: "Butler University", type: "College", state: "IN", city: "Indianapolis", lat: 39.8399145, lng: -86.1726021, status: "active", president: "Lenoire P.", link: null, source: "public_map", created_at: "", updated_at: "" },
   ],
+  publicMapSnapshots: [
+    { id: "snap1", snapshot_date: "2026-09-01", active_count: 1, launching_count: 0, created_at: "" },
+  ],
 };
 const LOG: SyncLogSummary = { bySource: { google_sheets: SYNC }, recent: [SYNC] };
 

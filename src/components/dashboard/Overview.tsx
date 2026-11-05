@@ -13,6 +13,7 @@ import { RangeTrendChart } from "@/components/charts/RangeTrendChart";
 import { EventTypeBarChart } from "@/components/charts/EventTypeBarChart";
 import { ChaptersTable } from "@/components/chapters/ChaptersTable";
 import { ChapterMap } from "@/components/map/ChapterMap";
+import { GoalProgress } from "@/components/dashboard/GoalProgress";
 import { ViewSwitcher, useView } from "@/components/layout/ViewSwitcher";
 import { localToday } from "@/lib/format/date";
 import { AdminSyncPanel } from "@/components/admin/AdminSyncPanel";
@@ -20,6 +21,8 @@ import { getDashboardData, getSyncLogSummary, type DashboardData, type SyncLogSu
 import {
   computeChapterCounts,
   computeEventBreakdown,
+  computeGoalProgress,
+  computeGoalTrend,
   computeMembershipStats,
   computeRetention,
   computeRsoBreakdown,
@@ -176,6 +179,8 @@ export function Overview() {
   const timeToCharter = computeTimeToCharter(data.chapters);
   const trend = computeTrendSeries(data.snapshots);
   const signupsTrend = computeSignupsTrend(data.signups);
+  const goalProgress = computeGoalProgress(data.publicMapChapters, localToday());
+  const goalTrend = computeGoalTrend(data.publicMapSnapshots);
 
   const newSignupsLast30Days = countRecentSignups(data.signups, 30);
 
@@ -204,6 +209,8 @@ export function Overview() {
           <ChapterMap chapters={data.publicMapChapters} info={METRIC_INFO.chapterMap} />
         ) : (
           <>
+            <GoalProgress goals={goalProgress} trend={goalTrend} />
+
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Active Chapters"
