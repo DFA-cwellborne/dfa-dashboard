@@ -203,7 +203,7 @@ export function Overview() {
         id="dashboard-view"
         role="tabpanel"
         aria-labelledby={`tab-${view}`}
-        className="flex-1 space-y-8 p-6"
+        className="flex-1 space-y-10 p-6 lg:p-8"
       >
         {view === "map" ? (
           <ChapterMap chapters={data.publicMapChapters} info={METRIC_INFO.chapterMap} />

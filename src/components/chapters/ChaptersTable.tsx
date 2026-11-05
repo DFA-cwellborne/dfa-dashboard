@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { clsx } from "clsx";
 import { ArrowUpDown, StickyNote } from "lucide-react";
 import { format } from "date-fns";
 import { Badge, statusToBadgeVariant } from "@/components/ui/Badge";
@@ -183,27 +184,33 @@ export function ChaptersTable({ chapters }: { chapters: ChapterRow[] }) {
       <div className="dfa-scrollbar overflow-x-auto rounded-2xl border border-navy/10 bg-white">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-navy/10 bg-navy/[0.02]">
-              <th className="px-4 py-3 text-left">
+            <tr className="border-b border-navy/10 bg-navy/[0.03]">
+              <th className="px-4 py-3.5 text-left">
                 <SortHeader label="Chapter" sortableKey="name" activeKey={sortKey} onSort={toggleSort} />
               </th>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3.5 text-left">
                 <SortHeader label="Type" sortableKey="school_type" activeKey={sortKey} onSort={toggleSort} />
               </th>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3.5 text-left">
                 <SortHeader label="State" sortableKey="state" activeKey={sortKey} onSort={toggleSort} />
               </th>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3.5 text-left">
                 <SortHeader label="Status" sortableKey="status" activeKey={sortKey} onSort={toggleSort} />
               </th>
-              <th className="px-4 py-3 text-right">
+              <th className="px-4 py-3.5 text-right">
                 <SortHeader label="Members" sortableKey="member_count" activeKey={sortKey} onSort={toggleSort} />
               </th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((c) => (
-              <tr key={c.external_id} className="border-b border-navy/5 last:border-0 hover:bg-blue/[0.03]">
+            {filtered.map((c, i) => (
+              <tr
+                key={c.external_id}
+                className={clsx(
+                  "border-b border-navy/5 last:border-0 hover:bg-blue/[0.04]",
+                  i % 2 === 1 && "bg-navy/[0.015]"
+                )}
+              >
                 <td className="relative px-4 py-3 font-medium text-navy">
                   <span tabIndex={0} className="group inline-flex cursor-default items-center gap-1.5 outline-none">
                     {c.name}
