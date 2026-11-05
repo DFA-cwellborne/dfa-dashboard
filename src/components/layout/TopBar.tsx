@@ -30,27 +30,29 @@ export function TopBar({
   refreshing?: boolean;
 }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-navy/10 bg-white/70 px-6 py-4 backdrop-blur">
+    <header className="dfa-gradient-navy flex flex-wrap items-center justify-between gap-3 px-6 py-4 shadow-[0_2px_12px_rgba(22,31,61,0.25)]">
       <div className="flex items-center gap-4">
-        <Logo compact />
+        <div className="rounded-xl bg-white px-2.5 py-1.5 shadow-sm">
+          <Logo compact />
+        </div>
         <div>
-          <h1 className="text-xl font-semibold text-navy">{title}</h1>
-          {subtitle ? <p className="text-sm text-navy/50">{subtitle}</p> : null}
+          <h1 className="text-xl font-semibold text-white">{title}</h1>
+          {subtitle ? <p className="text-sm text-white/55">{subtitle}</p> : null}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-col items-end text-xs leading-tight">
-          <span className="text-navy/40" data-testid="data-as-of">
+          <span className="text-white/45" data-testid="data-as-of">
             {latestSync
               ? `Last synced: ${format(new Date(latestSync.finished_at), "MMM d, yyyy 'at' h:mm a")}`
               : "No synced data yet"}
           </span>
           {refreshFailed ? (
-            <span className="flex items-center gap-1 text-red" data-testid="refresh-status">
+            <span className="flex items-center gap-1 text-[#ff8c89]" data-testid="refresh-status">
               <AlertTriangle size={11} /> Couldn&apos;t refresh — showing last loaded data
             </span>
           ) : lastCheckedAt ? (
-            <span className="flex items-center gap-1 text-navy/40" data-testid="refresh-status">
+            <span className="flex items-center gap-1 text-white/45" data-testid="refresh-status">
               Page checked <RelativeTime date={lastCheckedAt} precise />
               <InfoTooltip text="This is when your browser last re-read the synced data — it's instant, but it only shows what's already synced. New chapter/event data itself arrives automatically about every 20 minutes; clicking refresh can't make that happen sooner." />
             </span>
@@ -63,7 +65,7 @@ export function TopBar({
             disabled={refreshing}
             aria-label="Refresh data"
             title="Refresh data"
-            className="rounded-full border border-navy/10 bg-white p-2 text-navy/50 transition-colors hover:bg-navy/5 hover:text-navy disabled:opacity-50"
+            className="rounded-full border border-white/15 bg-white/10 p-2 text-white/70 transition-colors hover:bg-white/20 hover:text-white disabled:opacity-50"
           >
             <RefreshCw size={16} className={clsx(refreshing && "animate-spin")} />
           </button>
@@ -73,7 +75,7 @@ export function TopBar({
             onClick={onOpenAdmin}
             aria-label="Sync settings"
             title="Sync settings"
-            className="rounded-full border border-navy/10 bg-white p-2 text-navy/50 transition-colors hover:bg-navy/5 hover:text-navy"
+            className="rounded-full border border-white/15 bg-white/10 p-2 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
           >
             <Settings size={16} />
           </button>

@@ -53,13 +53,13 @@ export function PasswordGate({ children }: { children: ReactNode }) {
   if (unlocked) return <>{children}</>;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f7f6f2] p-6">
+    <div className="dfa-gradient-navy flex min-h-screen items-center justify-center p-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-2xl border border-navy/10 bg-white p-6 shadow-[0_1px_2px_rgba(31,43,81,0.06),0_8px_24px_-12px_rgba(31,43,81,0.15)]"
+        className="w-full max-w-sm rounded-2xl border border-navy/10 bg-white p-7 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.4)]"
       >
         <Logo />
-        <h1 className="mt-4 text-lg font-semibold text-navy">Staff dashboard</h1>
+        <h1 className="mt-5 text-lg font-semibold text-navy">Staff dashboard</h1>
         <p className="mt-1 text-sm text-navy/60">Enter the staff password to continue.</p>
         <input
           type="password"
