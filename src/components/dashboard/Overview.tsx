@@ -209,6 +209,12 @@ export function Overview() {
           <ChapterMap chapters={data.publicMapChapters} info={METRIC_INFO.chapterMap} />
         ) : (
           <>
+            <p className="max-w-3xl text-sm text-navy/60">
+              Chapter growth, membership, and program activity across every reporting DFA chapter — for donors,
+              board members, and the organizing team. Synced automatically from Dream for America&apos;s chapter
+              systems, typically every 20 minutes.
+            </p>
+
             <GoalProgress goals={goalProgress} trend={goalTrend} />
 
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
