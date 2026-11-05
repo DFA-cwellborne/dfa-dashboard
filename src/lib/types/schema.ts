@@ -7,7 +7,30 @@ export type SchoolType = "HS" | "College";
 export type ChapterStatus = "active" | "inactive" | "pending_launch";
 export type LocaleType = "urban" | "suburban" | "rural" | null;
 
-export type DataSource = "google_sheets" | "airtable" | "breakthru" | "manual";
+export type DataSource = "google_sheets" | "airtable" | "breakthru" | "manual" | "public_map";
+
+export type PublicMapStatus = "active" | "launching";
+
+/**
+ * One row from the public "Chapter Map" Google Sheet — the same sheet that
+ * drives the live map at dreamforamerica.org/chapters/, published-to-web as
+ * CSV. Deliberately a separate shape from `Chapter`: this sheet models a
+ * different, overlapping-but-not-identical set of chapters (see
+ * publicMapSync.ts for why it isn't merged with the Chapter Master List).
+ */
+export interface PublicMapChapter {
+  externalId: string;
+  school: string;
+  type: string | null;
+  state: string | null;
+  city: string | null;
+  lat: number;
+  lng: number;
+  status: PublicMapStatus;
+  president: string | null;
+  link: string | null;
+  source: DataSource;
+}
 
 export interface Chapter {
   /** Stable external id — slugified chapter name (the sheet has no explicit id column). */

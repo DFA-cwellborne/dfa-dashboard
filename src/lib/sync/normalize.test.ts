@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { slugifyName } from "@/lib/types/schema";
-import { chapterFromMasterListRow, dedupeChapters, normalizeEventRow, normalizeSignupRow } from "./normalize";
+import { chapterFromMasterListRow, dedupeChapters, normalizeEventRow, normalizeSignupRow, publicMapChapterFromCsvRow } from "./normalize";
 
 // Column order of the "Chapter Master List" tab:
 // School, C/H, State, Pres name, email, phone, Breakthru, Membership sheet,
@@ -241,5 +241,51 @@ describe("dedupeChapters", () => {
 
   it("handles an empty list", () => {
     expect(dedupeChapters([])).toEqual({ chapters: [], duplicates: [] });
+  });
+});
+
+describe("publicMapChapterFromCsvRow", () => {
+  const row = (extra: Record<string, string> = {}) => ({
+    school: "Rice University", type: "College", state: "TX", city: "Houston",
+    lat: "29.7174", lng: "-95.4018", status: "active", president: "Jane D.",
+    link: "https://community.dreamforamerica.breakthruapp.com/dfa-rice",
+    ...extra,
+  });
+
+  it("maps a well-formed active row", () => {
+    const c = publicMapChapterFromCsvRow(row())!;
+    expect(c).toMatchObject({
+      externalId: "rice-university", school: "Rice University", type: "College",
+      state: "TX", city: "Houston", lat: 29.7174, lng: -95.4018, status: "active",
+      president: "Jane D.", source: "public_map",
+    });
+  });
+
+  it("collapses any non-'active' status (including the real 'launching' value, blanks, and typos) to 'launching' — matches the live map's own rule", () => {
+    expect(publicMapChapterFromCsvRow(row({ status: "launching" }))!.status).toBe("launching");
+    expect(publicMapChapterFromCsvRow(row({ status: "" }))!.status).toBe("launching");
+    expect(publicMapChapterFromCsvRow(row({ status: "Active " }))!.status).toBe("active"); // trims/case-insensitive
+    expect(publicMapChapterFromCsvRow(row({ status: "pending" }))!.status).toBe("launching");
+  });
+
+  it("drops a row with no school name", () => {
+    expect(publicMapChapterFromCsvRow(row({ school: "" }))).toBeNull();
+  });
+
+  it("drops a row with a missing or non-numeric lat/lng rather than guessing — matches the live map dropping such rows from the map entirely", () => {
+    expect(publicMapChapterFromCsvRow(row({ lat: "" }))).toBeNull();
+    expect(publicMapChapterFromCsvRow(row({ lng: "" }))).toBeNull();
+    expect(publicMapChapterFromCsvRow(row({ lat: "not-a-number" }))).toBeNull();
+  });
+
+  it("treats optional fields (type, city, president, link) as null when blank, not empty strings", () => {
+    const c = publicMapChapterFromCsvRow(row({ type: "", city: "", president: "", link: "" }))!;
+    expect(c).toMatchObject({ type: null, city: null, president: null, link: null });
+  });
+
+  it("slugifies the school name the same way as the Chapter Master List, so ids are built consistently project-wide", () => {
+    expect(publicMapChapterFromCsvRow(row({ school: "  University of Oklahoma " }))!.externalId).toBe(
+      "university-of-oklahoma"
+    );
   });
 });

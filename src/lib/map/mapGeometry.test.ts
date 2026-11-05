@@ -1,25 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { MAP_HEIGHT, MAP_WIDTH, getStateCentroid, getStateShapes, placeChapterDots } from "./mapGeometry";
-import { STATE_NAMES, normalizeState } from "./usStates";
+import { MAP_HEIGHT, MAP_WIDTH, getStateShapes, placePublicMapDots, projectLonLat } from "./mapGeometry";
+import { STATE_NAMES } from "./usStates";
 
-const ch = (name: string, state: string | null) => ({ external_id: name.toLowerCase().replace(/\s+/g, "-"), name, state });
+const ch = (name: string, lat: number, lng: number) => ({
+  externalId: name.toLowerCase().replace(/\s+/g, "-"),
+  name,
+  lat,
+  lng,
+});
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
-describe("normalizeState", () => {
-  it("accepts abbreviations and full names in any case/spacing", () => {
-    expect(normalizeState("TX")).toBe("TX");
-    expect(normalizeState(" tx ")).toBe("TX");
-    expect(normalizeState("Texas")).toBe("TX");
-    expect(normalizeState("new  york".replace("  ", " "))).toBe("NY");
-    expect(normalizeState("district of columbia")).toBe("DC");
-  });
-
-  it("rejects blanks and things that aren't on the map", () => {
-    for (const bad of ["", "  ", null, undefined, "ZZ", "Puerto Rico", "Narnia"]) {
-      expect(normalizeState(bad)).toBeNull();
-    }
-  });
-});
+// Real coordinates used throughout — same schools/campuses as the live public map CSV.
+const OU = ch("University of Oklahoma", 35.1987162, -97.4448963); // Norman, OK
+const BUTLER = ch("Butler University", 39.8399145, -86.1726021); // Indianapolis, IN
 
 describe("state shapes", () => {
   it("has a drawable shape for all 50 states + DC, each exactly once", () => {
@@ -29,89 +22,61 @@ describe("state shapes", () => {
     expect(shapes.every((s) => s.d.startsWith("M"))).toBe(true);
     expect(Object.keys(STATE_NAMES).every((abbr) => shapes.some((s) => s.abbr === abbr))).toBe(true);
   });
+});
 
-  it("has a centroid inside the map for every state", () => {
-    for (const abbr of Object.keys(STATE_NAMES)) {
-      const c = getStateCentroid(abbr);
-      expect(c, abbr).not.toBeNull();
-      const [x, y] = c!;
-      expect(x).toBeGreaterThan(0);
-      expect(x).toBeLessThan(MAP_WIDTH);
-      expect(y).toBeGreaterThan(0);
-      expect(y).toBeLessThan(MAP_HEIGHT);
-    }
+describe("projectLonLat", () => {
+  it("places real US coordinates inside the map's pixel space", () => {
+    const [x, y] = projectLonLat(OU.lng, OU.lat)!;
+    expect(x).toBeGreaterThan(0);
+    expect(x).toBeLessThan(MAP_WIDTH);
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(MAP_HEIGHT);
   });
 
-  it("puts states where you'd expect (west < east, north < south)", () => {
-    const [caX] = getStateCentroid("CA")!;
-    const [nyX] = getStateCentroid("NY")!;
-    const [, meY] = getStateCentroid("ME")!;
-    const [, flY] = getStateCentroid("FL")!;
-    expect(caX).toBeLessThan(nyX);
+  it("puts west coordinates left of east coordinates, and north above south", () => {
+    const [laX] = projectLonLat(-118.24, 34.05)!; // Los Angeles
+    const [nyX] = projectLonLat(-74.0, 40.71)!; // New York
+    const [, meY] = projectLonLat(-69.77, 44.31)!; // Maine
+    const [, flY] = projectLonLat(-81.52, 27.77)!; // Florida
+    expect(laX).toBeLessThan(nyX);
     expect(meY).toBeLessThan(flY);
   });
 });
 
-describe("placeChapterDots", () => {
-  it("puts a lone chapter with no known campus location exactly on its state's centroid", () => {
-    const { dots } = placeChapterDots([ch("Some Unmapped School", "IN")]);
-    const [cx, cy] = getStateCentroid("IN")!;
-    expect(dots).toHaveLength(1);
-    expect([dots[0].x, dots[0].y]).toEqual([cx, cy]);
+describe("placePublicMapDots", () => {
+  it("places a lone chapter at its real projected coordinates", () => {
+    const dots = placePublicMapDots([OU]);
+    const [x, y] = projectLonLat(OU.lng, OU.lat)!;
+    expect(dots).toEqual([{ chapter: OU, x, y }]);
   });
 
-  it("places a chapter with a known campus location at its real coordinates, not the state centroid", () => {
-    const { dots } = placeChapterDots([ch("Butler University", "IN")]);
-    const [stateCx, stateCy] = getStateCentroid("IN")!;
-    expect(dots).toHaveLength(1);
-    // Indianapolis is real and distinct from Indiana's geometric centroid.
-    expect(dist(dots[0], { x: stateCx, y: stateCy })).toBeGreaterThan(1);
-  });
-
-  it("keeps two chapters in the same state apart when their real campuses are far apart", () => {
-    // Abingdon, VA and Crozet, VA are on opposite ends of the state — this
-    // used to render as one stacked dot when placement only used state.
-    const { dots } = placeChapterDots([ch("Abingdon High School", "VA"), ch("Western Albemarle High School", "VA")]);
+  it("keeps two chapters with genuinely different campuses apart", () => {
+    const dots = placePublicMapDots([OU, BUTLER]);
     expect(dots).toHaveLength(2);
     expect(dist(dots[0], dots[1])).toBeGreaterThan(50);
   });
 
-  it("fans out multiple chapters that resolve to the same known campus location instead of stacking them", () => {
-    const { dots } = placeChapterDots([
-      { external_id: "a", name: "Butler University", state: "IN" },
-      { external_id: "b", name: "Butler University", state: "IN" },
-    ]);
-    expect(dots).toHaveLength(2);
-    expect(dist(dots[0], dots[1])).toBeGreaterThanOrEqual(15.9);
-  });
-
-  it("fans out same-state chapters so no two dots overlap", () => {
-    const chapters = Array.from({ length: 9 }, (_, i) => ch(`School ${i}`, "TX"));
-    const { dots } = placeChapterDots(chapters);
+  it("fans out chapters that share (almost) the same coordinates instead of stacking them", () => {
+    const chapters = Array.from({ length: 9 }, (_, i) => ch(`School ${i}`, 38.9, -77.0 + i * 0.0001));
+    const dots = placePublicMapDots(chapters);
     expect(dots).toHaveLength(9);
     for (let i = 0; i < dots.length; i++)
-      for (let j = i + 1; j < dots.length; j++) expect(dist(dots[i], dots[j])).toBeGreaterThanOrEqual(15.9);
+      for (let j = i + 1; j < dots.length; j++) expect(dist(dots[i], dots[j])).toBeGreaterThanOrEqual(23.9);
   });
 
   it("keeps positions stable no matter what order the chapters arrive in", () => {
-    const a = [ch("Rice", "TX"), ch("Baylor", "TX"), ch("UT Austin", "TX")];
-    const pos = (list: typeof a) =>
-      Object.fromEntries(placeChapterDots(list).dots.map((d) => [d.chapter.name, [d.x.toFixed(3), d.y.toFixed(3)]]));
-    expect(pos([...a].reverse())).toEqual(pos(a));
-  });
-
-  it("treats 'tx', 'TX' and 'Texas' as the same state", () => {
-    const { dots } = placeChapterDots([ch("A", "tx"), ch("B", "TX"), ch("C", "Texas")]);
-    expect(new Set(dots.map((d) => d.state))).toEqual(new Set(["TX"]));
-  });
-
-  it("returns chapters with no usable state as unplaced instead of dropping or mis-plotting them", () => {
-    const { dots, unplaced } = placeChapterDots([ch("A", null), ch("B", ""), ch("C", "PR"), ch("D", "OK")]);
-    expect(dots.map((d) => d.chapter.name)).toEqual(["D"]);
-    expect(unplaced.map((c) => c.name).sort()).toEqual(["A", "B", "C"]);
+    const list = [OU, BUTLER, ch("Rice University", 29.7174, -95.4018)];
+    const pos = (l: typeof list) =>
+      Object.fromEntries(placePublicMapDots(l).map((d) => [d.chapter.name, [d.x.toFixed(3), d.y.toFixed(3)]]));
+    expect(pos([...list].reverse())).toEqual(pos(list));
   });
 
   it("handles an empty list", () => {
-    expect(placeChapterDots([])).toEqual({ dots: [], unplaced: [] });
+    expect(placePublicMapDots([])).toEqual([]);
+  });
+
+  it("never drops a chapter silently for real US coordinates", () => {
+    const chapters = [OU, BUTLER, ch("Rice University", 29.7174, -95.4018)];
+    expect(placePublicMapDots(chapters)).toHaveLength(3);
   });
 });

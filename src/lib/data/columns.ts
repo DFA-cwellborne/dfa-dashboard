@@ -13,4 +13,6 @@ export const PUBLIC_COLUMNS = {
   sheet_summary:
     "id,total_chapters,total_members,active_chapters,status_active,status_inactive,status_pending_launch,rso_recognized,rso_pending,rso_not_recognized,rso_expired,synced_at",
   sync_log: "id,source,success,started_at,finished_at,records_processed,errors,created_at",
+  public_map_chapters: "external_id,school,type,state,city,lat,lng,status,president,link,source,created_at,updated_at",
+  public_map_snapshots: "id,snapshot_date,active_count,launching_count,created_at",
 } as const;

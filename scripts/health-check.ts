@@ -11,7 +11,7 @@ const SITE_URL = (process.env.SITE_URL ?? "https://dfa-cwellborne.github.io/dfa-
 
 // Actions cron is every 20 min; GitHub can delay scheduled runs, so allow slack.
 const MAX_SYNC_AGE_MIN = 60;
-const SOURCES = ["google_sheets", "airtable"] as const;
+const SOURCES = ["google_sheets", "airtable", "public_map"] as const;
 
 type Level = "PASS" | "WARN" | "FAIL";
 interface Result {
@@ -61,7 +61,7 @@ async function checkSupabase() {
   // Read the tables exactly as a stranger could — every column — and look for personal data.
   const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/;
   const PHONE = /\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}/;
-  for (const table of ["chapters", "chapter_signups", "chapter_events"]) {
+  for (const table of ["chapters", "chapter_signups", "chapter_events", "public_map_chapters"]) {
     try {
       const res = await rest(`${table}?select=*&limit=1000`);
       const text = await res.text();

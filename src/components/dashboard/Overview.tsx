@@ -47,7 +47,7 @@ const REFRESH_INTERVAL_MS = 20_000;
 
 const METRIC_INFO = {
   chapterMap:
-    "One dot per chapter on the Chapter Master List, placed at its real campus location where we have one on file. Chapters we haven't mapped a campus for yet — and any that share a spot with another chapter — fan out around a shared center instead of stacking. New chapters appear automatically after the next sync.",
+    "Same map and data as the public chapter map at dreamforamerica.org/chapters/ — one pin per chapter at its real campus location. Chapters sharing a spot fan out around a shared center instead of stacking. New chapters appear automatically after the next sync.",
   activeChapters:
     "Chapters currently Active or Pending Launch, from the Chapter Master List tab in Google Sheets. “Total” includes inactive chapters too.",
   totalMembers:
@@ -201,7 +201,7 @@ export function Overview() {
         className="flex-1 space-y-8 p-6"
       >
         {view === "map" ? (
-          <ChapterMap chapters={data.chapters} info={METRIC_INFO.chapterMap} />
+          <ChapterMap chapters={data.publicMapChapters} info={METRIC_INFO.chapterMap} />
         ) : (
           <>
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

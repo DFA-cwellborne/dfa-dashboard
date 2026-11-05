@@ -68,6 +68,30 @@ export type ChapterSignupRow = {
   created_at: string;
 }
 
+export type PublicMapChapterRow = {
+  external_id: string;
+  school: string;
+  type: string | null;
+  state: string | null;
+  city: string | null;
+  lat: number;
+  lng: number;
+  status: "active" | "launching";
+  president: string | null;
+  link: string | null;
+  source: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PublicMapSnapshotRow = {
+  id: string;
+  snapshot_date: string;
+  active_count: number;
+  launching_count: number;
+  created_at: string;
+}
+
 export type SyncLogRow = {
   id: string;
   source: string;
@@ -116,6 +140,18 @@ export interface Database {
         Row: ChapterSignupRow;
         Insert: Partial<ChapterSignupRow>;
         Update: Partial<ChapterSignupRow>;
+        Relationships: never[];
+      };
+      public_map_chapters: {
+        Row: PublicMapChapterRow;
+        Insert: Partial<PublicMapChapterRow>;
+        Update: Partial<PublicMapChapterRow>;
+        Relationships: never[];
+      };
+      public_map_snapshots: {
+        Row: PublicMapSnapshotRow;
+        Insert: Partial<PublicMapSnapshotRow>;
+        Update: Partial<PublicMapSnapshotRow>;
         Relationships: never[];
       };
     };

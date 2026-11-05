@@ -101,7 +101,7 @@ async function runAdapter(adapter: SourceAdapter): Promise<AdapterRunOutcome> {
   };
 }
 
-async function logSyncResult(result: SyncResult) {
+export async function logSyncResult(result: SyncResult) {
   try {
     const supabase = getServiceRoleSupabase();
     await supabase.from("sync_log").insert({

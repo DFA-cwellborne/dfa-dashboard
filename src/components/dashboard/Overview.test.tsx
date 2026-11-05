@@ -32,6 +32,9 @@ const DATA: DashboardData = {
   snapshots: [], events: [], signups: [],
   summary: { id: "default", total_chapters: 6, total_members: 9, active_chapters: 4, status_active: 4, status_inactive: 0, status_pending_launch: 2, rso_recognized: 5, rso_pending: 7, rso_not_recognized: 0, rso_expired: 0, synced_at: "" },
   latestSync: SYNC,
+  publicMapChapters: [
+    { external_id: "butler-university", school: "Butler University", type: "College", state: "IN", city: "Indianapolis", lat: 39.8399145, lng: -86.1726021, status: "active", president: "Lenoire P.", link: null, source: "public_map", created_at: "", updated_at: "" },
+  ],
 };
 const LOG: SyncLogSummary = { bySource: { google_sheets: SYNC }, recent: [SYNC] };
 

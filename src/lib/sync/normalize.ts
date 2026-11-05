@@ -8,7 +8,7 @@ import {
   getField,
 } from "@/config/sheetMapping";
 import { slugifyName } from "@/lib/types/schema";
-import type { Chapter, ChapterEvent, ChapterSignup, DataSource } from "@/lib/types/schema";
+import type { Chapter, ChapterEvent, ChapterSignup, DataSource, PublicMapChapter } from "@/lib/types/schema";
 
 function toStringOrNull(v: unknown): string | null {
   if (v === undefined || v === null) return null;
@@ -140,4 +140,38 @@ export function dedupeChapters(chapters: Chapter[]): { chapters: Chapter[]; dupl
   }
 
   return { chapters: deduped, duplicates };
+}
+
+/**
+ * One row from the public chapter-map CSV (already header-keyed, lowercase
+ * keys — see parseCsvObjects in ./csv.ts): school, type, state, city, lat,
+ * lng, status, president, link. Mirrors the live map's own acceptance rules
+ * exactly: a row with no school name, or a non-finite lat/lng, is dropped
+ * rather than approximated — the live map does the same (it skips such rows
+ * instead of guessing a location). Status collapses to exactly two buckets,
+ * same as the live map's own `k = status==="active" ? "active" : "launching"`.
+ */
+export function publicMapChapterFromCsvRow(row: Record<string, string>): PublicMapChapter | null {
+  const school = toStringOrNull(row.school);
+  if (!school) return null;
+
+  // Number("") is 0, not NaN — toNumberOrNull (unlike a bare Number()/isFinite
+  // check) treats a blank cell as missing rather than as real coordinate 0,0.
+  const lat = toNumberOrNull(row.lat);
+  const lng = toNumberOrNull(row.lng);
+  if (lat === null || lng === null) return null;
+
+  return {
+    externalId: slugifyName(school),
+    school,
+    type: toStringOrNull(row.type),
+    state: toStringOrNull(row.state),
+    city: toStringOrNull(row.city),
+    lat,
+    lng,
+    status: (row.status ?? "").trim().toLowerCase() === "active" ? "active" : "launching",
+    president: toStringOrNull(row.president),
+    link: toStringOrNull(row.link),
+    source: "public_map",
+  };
 }

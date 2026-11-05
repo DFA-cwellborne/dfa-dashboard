@@ -6,6 +6,7 @@ import type {
   ChapterRow,
   ChapterSignupRow,
   ChapterSnapshotRow,
+  PublicMapChapterRow,
   SheetSummaryRow,
   SyncLogRow,
 } from "@/lib/types/database";
@@ -18,6 +19,8 @@ export interface DashboardData {
   signups: ChapterSignupRow[];
   summary: SheetSummaryRow | null;
   latestSync: SyncLogRow | null;
+  /** From the separate public chapter-map sheet — see README "What each source actually provides". */
+  publicMapChapters: PublicMapChapterRow[];
 }
 
 const EMPTY: DashboardData = {
@@ -28,6 +31,7 @@ const EMPTY: DashboardData = {
   signups: [],
   summary: null,
   latestSync: null,
+  publicMapChapters: [],
 };
 
 /**
@@ -41,7 +45,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const supabase = getBrowserSupabase();
 
-  const [chaptersRes, snapshotsRes, eventsRes, signupsRes, summaryRes, syncLogRes] =
+  const [chaptersRes, snapshotsRes, eventsRes, signupsRes, summaryRes, syncLogRes, publicMapRes] =
     await Promise.all([
       supabase.from("chapters").select(PUBLIC_COLUMNS.chapters).order("name"),
       supabase.from("chapter_snapshots").select(PUBLIC_COLUMNS.chapter_snapshots).order("snapshot_date"),
@@ -49,12 +53,13 @@ export async function getDashboardData(): Promise<DashboardData> {
       supabase.from("chapter_signups").select(PUBLIC_COLUMNS.chapter_signups).order("submitted_at"),
       supabase.from("sheet_summary").select(PUBLIC_COLUMNS.sheet_summary).eq("id", "default").maybeSingle(),
       supabase.from("sync_log").select(PUBLIC_COLUMNS.sync_log).order("created_at", { ascending: false }).limit(1),
+      supabase.from("public_map_chapters").select(PUBLIC_COLUMNS.public_map_chapters).order("school"),
     ]);
 
   // A failed request must not masquerade as "no data" — with the background
   // refresh, one dropped request would otherwise blank the whole dashboard.
   // Throw so the caller can keep showing the last good data instead.
-  const failed = [chaptersRes, snapshotsRes, eventsRes, signupsRes, summaryRes, syncLogRes].find(
+  const failed = [chaptersRes, snapshotsRes, eventsRes, signupsRes, summaryRes, syncLogRes, publicMapRes].find(
     (r) => r.error
   );
   if (failed?.error) throw new Error(`Supabase query failed: ${failed.error.message}`);
@@ -67,6 +72,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     signups: signupsRes.data ?? [],
     summary: summaryRes.data ?? null,
     latestSync: syncLogRes.data?.[0] ?? null,
+    publicMapChapters: publicMapRes.data ?? [],
   };
 }
 

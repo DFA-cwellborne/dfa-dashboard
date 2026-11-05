@@ -2,8 +2,7 @@ import { geoAlbersUsa, geoPath, type GeoPermissibleObjects, type GeoProjection }
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import topology from "us-atlas/states-10m.json";
-import { getChapterLocation } from "./chapterLocations";
-import { STATE_NAMES, normalizeState } from "./usStates";
+import { STATE_NAMES } from "./usStates";
 
 // us-atlas's plain (non-albers) topology holds real lon/lat, so we project it
 // ourselves with a fitted geoAlbersUsa — that's what lets a chapter's real
@@ -20,11 +19,7 @@ export interface StateShape {
 
 const NAME_TO_ABBR = new Map(Object.entries(STATE_NAMES).map(([abbr, name]) => [name, abbr]));
 
-let cache: {
-  shapes: StateShape[];
-  centroids: Map<string, [number, number]>;
-  projection: GeoProjection;
-} | null = null;
+let cache: { shapes: StateShape[]; projection: GeoProjection } | null = null;
 
 function load() {
   if (cache) return cache;
@@ -34,15 +29,13 @@ function load() {
   const path = geoPath(projection);
 
   const shapes: StateShape[] = [];
-  const centroids = new Map<string, [number, number]>();
   for (const f of states.features) {
     const abbr = NAME_TO_ABBR.get(f.properties.name);
     const d = path(f);
     if (!abbr || !d) continue;
     shapes.push({ abbr, name: f.properties.name, d });
-    centroids.set(abbr, path.centroid(f));
   }
-  cache = { shapes, centroids, projection };
+  cache = { shapes, projection };
   return cache;
 }
 
@@ -50,23 +43,18 @@ export function getStateShapes(): StateShape[] {
   return load().shapes;
 }
 
-export function getStateCentroid(abbr: string): [number, number] | null {
-  return load().centroids.get(abbr) ?? null;
-}
-
 /** Projects real-world [lon, lat] into the map's pixel space, or null if geoAlbersUsa can't place it (outside the US). */
 export function projectLonLat(lon: number, lat: number): [number, number] | null {
   return load().projection([lon, lat]);
 }
 
-export interface ChapterDot<T> {
+export interface MapDot<T> {
   chapter: T;
-  state: string;
   x: number;
   y: number;
 }
 
-const DOT_DIAMETER = 16; // map units (dot + breathing room)
+const DOT_DIAMETER = 24; // map units (dot + breathing room) — slightly larger than the old state-level map since pins now sit much closer together at real campus density
 // Points closer together than this are treated as "the same spot" (the same
 // campus, or two chapters in the same town) and fanned out around their
 // shared center instead of stacking on one pixel.
@@ -101,53 +89,34 @@ function clusterBySpot<T>(points: { x: number; y: number; item: T }[]): { cx: nu
 }
 
 /**
- * Places each chapter at its real campus location when one is on file (see
- * chapterLocations.ts), fanning out chapters that share a spot — the same
- * campus, or multiple chapters in the same city — around their shared point.
- * Chapters we don't have a campus location for yet fall back to fanning out
- * around their state's centroid, same as before. Chapters with a blank or
- * unrecognized state (territories, typos) come back in `unplaced`.
+ * Places each chapter at its real lat/lng (every row on the public chapter
+ * map has one — see publicMapChapterFromCsvRow, which drops anything that
+ * doesn't), fanning out chapters that share a spot — the same campus, or
+ * several chapters in one city/county — around their shared point so they
+ * never stack on one pixel. A chapter whose coordinates fall outside what
+ * geoAlbersUsa can place (not expected for real US schools) is silently
+ * excluded rather than mis-plotted — this is a "can't happen" case for this
+ * data, not a user-facing situation worth a UI affordance.
  */
-export function placeChapterDots<T extends { external_id: string; name: string; state: string | null }>(
+export function placePublicMapDots<T extends { externalId: string; name: string; lat: number; lng: number }>(
   chapters: T[]
-): { dots: ChapterDot<T>[]; unplaced: T[] } {
-  const unplaced: T[] = [];
-  const located: { chapter: T; state: string; x: number; y: number }[] = [];
-  const byState = new Map<string, T[]>();
+): MapDot<T>[] {
+  const located = chapters
+    .map((chapter) => {
+      const xy = projectLonLat(chapter.lng, chapter.lat);
+      return xy ? { chapter, x: xy[0], y: xy[1] } : null;
+    })
+    .filter((e): e is { chapter: T; x: number; y: number } => e !== null);
 
-  for (const chapter of chapters) {
-    const abbr = normalizeState(chapter.state);
-    if (!abbr || !getStateCentroid(abbr)) {
-      unplaced.push(chapter);
-      continue;
-    }
-    const loc = getChapterLocation(chapter.name);
-    const projected = loc ? projectLonLat(loc.lon, loc.lat) : null;
-    if (projected) {
-      located.push({ chapter, state: abbr, x: projected[0], y: projected[1] });
-    } else {
-      byState.set(abbr, [...(byState.get(abbr) ?? []), chapter]);
-    }
-  }
+  const sorted = [...located].sort(
+    (a, b) => a.chapter.name.localeCompare(b.chapter.name) || a.chapter.externalId.localeCompare(b.chapter.externalId)
+  );
 
-  const dots: ChapterDot<T>[] = [];
-
-  const sortEntries = <E extends { chapter: T }>(entries: E[]) =>
-    [...entries].sort((a, b) => a.chapter.name.localeCompare(b.chapter.name) || a.chapter.external_id.localeCompare(b.chapter.external_id));
-
-  for (const cluster of clusterBySpot(located.map((e) => ({ x: e.x, y: e.y, item: e })))) {
-    for (const { item, x, y } of ringAround(cluster.cx, cluster.cy, sortEntries(cluster.items))) {
-      dots.push({ chapter: item.chapter, state: item.state, x, y });
+  const dots: MapDot<T>[] = [];
+  for (const cluster of clusterBySpot(sorted.map((e) => ({ x: e.x, y: e.y, item: e.chapter })))) {
+    for (const { item, x, y } of ringAround(cluster.cx, cluster.cy, cluster.items)) {
+      dots.push({ chapter: item, x, y });
     }
   }
-
-  for (const [abbr, group] of byState) {
-    const [cx, cy] = getStateCentroid(abbr)!;
-    const sorted = sortEntries(group.map((chapter) => ({ chapter })));
-    for (const { item, x, y } of ringAround(cx, cy, sorted)) {
-      dots.push({ chapter: item.chapter, state: abbr, x, y });
-    }
-  }
-
-  return { dots, unplaced };
+  return dots;
 }

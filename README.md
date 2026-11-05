@@ -25,6 +25,19 @@ different, and the sync layer reflects that:
   points transaction) — no chapters/groups endpoint. `breakthruClient.ts` has
   a real, working client for it; it isn't wired into the sync loop yet since
   there's no clear mapping from individual people to chapter-level metrics.
+- **Public chapter map CSV** — a *third*, separate Google Sheet (a "Public
+  map" tab, published-to-web as CSV, no credentials needed) that already
+  drives the live map at dreamforamerica.org/chapters/: `school, type,
+  state, city, lat, lng, status, president, link`, status only ever
+  `active`/`launching`. Deliberately **not merged** with the Chapter Master
+  List — chapter names don't always match exactly between the two sheets
+  (e.g. "Western Albemarle HS" vs "Western Albemarle High School"), so
+  merging risks silently duplicating or misassigning chapters. It's richer
+  and more current than the Master List (real coordinates, more chapters)
+  and is the only source for the Map view and the Goals feature — the rest
+  of the dashboard (member counts, RSO status, etc.) is untouched by it.
+  See `src/lib/sync/publicMapAdapter.ts` / `publicMapSync.ts` and the
+  `public_map_chapters` / `public_map_snapshots` tables (migration `0005`).
 
 ## Architecture
 
@@ -184,15 +197,36 @@ matching, add it to the relevant alias list.
 
 ### Auto-sync
 
-Handled entirely by `.github/workflows/sync.yml` — no server or long-lived
-process needed. It runs `npm run sync:run` (`scripts/run-sync.ts` →
-`runSync()`) every 20 minutes via a GitHub Actions `schedule` cron, using the
-repo secrets above. GitHub Actions cron jobs on public repos are free with no
-frequency limit (unlike Vercel's free tier, which caps cron at once/day).
+No server or long-lived process needed — `.github/workflows/sync.yml` runs
+`npm run sync:run` (`scripts/run-sync.ts` → `runSync()` + `syncPublicMap()`
+in parallel), using the repo secrets above, every 20 minutes.
 
-Note: GitHub auto-disables scheduled workflows after 60 days with no repo
-activity — push anything, or run `sync.yml` manually once, to re-enable it if
-that ever happens.
+**What actually triggers it**: not GitHub's own `schedule:` cron. That had a
+documented, ongoing reliability problem (multi-hour delays instead of the
+configured 20 minutes — isolated to GitHub's `schedule:` trigger-evaluation
+specifically). Instead, **Supabase's own `pg_cron`** (migration
+`0004_pg_cron_github_dispatch.sql`) calls GitHub's `workflow_dispatch` REST
+API every 20 minutes — a different, unaffected code path. The GitHub PAT it
+uses lives in Supabase Vault (`vault.decrypted_secrets`, under the hood only
+reachable server-side, never via the public anon-key API), set once by hand:
+
+```sql
+select vault.create_secret('<classic PAT with the "workflow" or "repo" scope>', 'github_pat');
+select vault.create_secret('https://api.github.com/repos/<owner>/<repo>/actions/workflows/sync.yml/dispatches', 'github_dispatch_url');
+```
+
+Use a **classic** PAT, not fine-grained — a fine-grained token's "Actions"
+permission returned `403 Resource not accessible by personal access token`
+on the `workflow_dispatch` call even with Actions set to Read and write;
+a classic token with the `workflow` (or `repo`) scope worked immediately.
+To rotate the token later: `select vault.update_secret((select id from vault.secrets where name = 'github_pat'), '<new token>');`
+
+`sync.yml` keeps `workflow_dispatch: {}` as both pg_cron's entry point and a
+manual-rerun escape hatch — it no longer has a `schedule:` trigger of its own.
+
+Note: GitHub auto-disables *manually re-run* workflows only after 60 days
+with no repo activity, same as before — not a concern here since pg_cron
+calls it every 20 minutes regardless of repo activity.
 
 ## Build order (for reference)
 

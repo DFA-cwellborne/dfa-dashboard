@@ -1,8 +1,11 @@
 name: Sync chapter data
 
 on:
-  schedule:
-    - cron: "*/20 * * * *"
+  # Triggered every 20 minutes by Supabase pg_cron (see supabase/migrations/
+  # 0004_pg_cron_github_dispatch.sql), which calls this dispatch endpoint
+  # directly. GitHub's own `schedule:` trigger is not used here — its
+  # trigger-evaluation has an ongoing platform-wide reliability bug that was
+  # causing this workflow to fire every 3-8 hours instead of every 20 minutes.
   workflow_dispatch: {}
 
 jobs:
