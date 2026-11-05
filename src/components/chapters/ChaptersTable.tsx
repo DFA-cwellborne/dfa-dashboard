@@ -1,9 +1,75 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, StickyNote } from "lucide-react";
+import { format } from "date-fns";
 import { Badge, statusToBadgeVariant } from "@/components/ui/Badge";
+import { safeExternalUrl } from "@/lib/security/safeUrl";
+import { parseDateOnly } from "@/lib/format/date";
 import type { ChapterRow } from "@/lib/types/database";
+
+const ALLOWED_LINK_HOSTS = ["breakthruapp.com", "dreamforamerica.org"];
+
+/**
+ * Richer per-chapter detail, shown on hover over the chapter name — the
+ * fields the sheet tracks beyond the roster basics (RSO/charter status,
+ * who's covering it, when it last had an event, and any notes). Hidden
+ * entirely when the chapter has none of this filled in yet, so an
+ * unremarkable chapter doesn't get a tooltip full of em dashes.
+ */
+function ChapterDetail({ chapter }: { chapter: ChapterRow }) {
+  const link = safeExternalUrl(chapter.link, ALLOWED_LINK_HOSTS);
+  const hasDetail =
+    chapter.rso_status || chapter.charter_status || chapter.staff_contact || chapter.last_event_date || chapter.notes;
+  if (!hasDetail) return null;
+
+  return (
+    <div
+      role="tooltip"
+      className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-72 rounded-lg bg-navy px-3 py-2.5 text-xs normal-case leading-snug text-white opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100"
+    >
+      <dl className="space-y-1">
+        {chapter.rso_status && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-white/60">RSO status</dt>
+            <dd className="text-right font-medium">{chapter.rso_status}</dd>
+          </div>
+        )}
+        {chapter.charter_status && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-white/60">Charter status</dt>
+            <dd className="text-right font-medium">{chapter.charter_status}</dd>
+          </div>
+        )}
+        {chapter.staff_contact && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-white/60">Staff contact</dt>
+            <dd className="text-right font-medium">{chapter.staff_contact}</dd>
+          </div>
+        )}
+        {chapter.last_event_date && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-white/60">Last event</dt>
+            <dd className="text-right font-medium">{format(parseDateOnly(chapter.last_event_date), "MMM d, yyyy")}</dd>
+          </div>
+        )}
+      </dl>
+      {chapter.notes && (
+        <p className="mt-2 border-t border-white/15 pt-2 text-white/90">{chapter.notes}</p>
+      )}
+      {link && (
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener"
+          className="pointer-events-auto mt-2 inline-block font-semibold text-gold underline"
+        >
+          Breakthru community
+        </a>
+      )}
+    </div>
+  );
+}
 
 type SortKey = "name" | "state" | "member_count" | "status" | "school_type";
 
@@ -138,7 +204,13 @@ export function ChaptersTable({ chapters }: { chapters: ChapterRow[] }) {
           <tbody>
             {filtered.map((c) => (
               <tr key={c.external_id} className="border-b border-navy/5 last:border-0 hover:bg-blue/[0.03]">
-                <td className="px-4 py-3 font-medium text-navy">{c.name}</td>
+                <td className="relative px-4 py-3 font-medium text-navy">
+                  <span tabIndex={0} className="group inline-flex cursor-default items-center gap-1.5 outline-none">
+                    {c.name}
+                    {c.notes && <StickyNote size={12} className="shrink-0 text-gold" aria-label="Has notes" />}
+                    <ChapterDetail chapter={c} />
+                  </span>
+                </td>
                 <td className="px-4 py-3 text-navy/70">{c.school_type ?? "—"}</td>
                 <td className="px-4 py-3 text-navy/70">{c.state ?? "—"}</td>
                 <td className="px-4 py-3">

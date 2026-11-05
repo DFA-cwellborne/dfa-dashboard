@@ -3,12 +3,14 @@ import { slugifyName } from "@/lib/types/schema";
 import { chapterFromMasterListRow, dedupeChapters, normalizeEventRow, normalizeSignupRow, publicMapChapterFromCsvRow } from "./normalize";
 
 // Column order of the "Chapter Master List" tab:
-// School, C/H, State, Pres name, email, phone, Breakthru, Membership sheet,
-// RSO Status, Charter Status, Status, Member Count, Last Event, Notes
+// 0 School, 1 C/H, 2 State, 3 Pres name, 4 email, 5 phone, 6 Breakthru link,
+// 7 Membership sheet, 8 RSO Status, 9 Charter Status, 10 Status,
+// 11 Member Count, 12 Contact (staff assigned), 13 Last Event Date, 14 Notes
 function masterRow(overrides: Record<number, unknown> = {}): unknown[] {
   const base: unknown[] = [
     "Butler University", "C", "IN", "Jane Doe", "j@example.com", "(555) 555-0100",
-    "", "", "Recognized", "Completed", "Active", "9", "", "",
+    "https://community.dreamforamerica.breakthruapp.com/dfa-bu", "https://sheets.google.com/secret-roster",
+    "Recognized", "Completed", "Active", "9", "Clayton", "2026-08-20", "Chartered fall 2026; strong start",
   ];
   for (const [i, v] of Object.entries(overrides)) base[Number(i)] = v;
   return base;
@@ -65,6 +67,33 @@ describe("chapterFromMasterListRow", () => {
     const c = chapterFromMasterListRow(masterRow({ 0: "  University of Oklahoma " }))!;
     expect(c.name).toBe("University of Oklahoma");
     expect(c.externalId).toBe("university-of-oklahoma");
+  });
+
+  it("maps RSO status, charter status, staff contact, last event date, notes, and the Breakthru link", () => {
+    const c = chapterFromMasterListRow(masterRow())!;
+    expect(c).toMatchObject({
+      rsoStatus: "Recognized",
+      charterStatus: "Completed",
+      staffContact: "Clayton",
+      lastEventDate: "2026-08-20",
+      notes: "Chartered fall 2026; strong start",
+      link: "https://community.dreamforamerica.breakthruapp.com/dfa-bu",
+    });
+  });
+
+  it("treats a blank last-event-date cell as no date, not an invalid-date error", () => {
+    expect(chapterFromMasterListRow(masterRow({ 13: "" }))!.lastEventDate).toBeNull();
+  });
+
+  it("never reads the president's name, email, or phone, or the membership-sheet link — those are PII/internal and must never reach the public anon-key table", () => {
+    const c = chapterFromMasterListRow(
+      masterRow({ 3: "Jane Doe", 4: "jane@example.com", 5: "(555) 555-0100", 7: "https://sheets.google.com/secret-roster" })
+    )!;
+    const values = Object.values(c);
+    expect(values).not.toContain("Jane Doe");
+    expect(values).not.toContain("jane@example.com");
+    expect(values).not.toContain("(555) 555-0100");
+    expect(values).not.toContain("https://sheets.google.com/secret-roster");
   });
 });
 

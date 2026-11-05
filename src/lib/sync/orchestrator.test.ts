@@ -69,6 +69,7 @@ const stubOpenApi = (attached: boolean) =>
 const chapter = (name: string): Chapter => ({
   externalId: name.toLowerCase().replace(/\s+/g, "-"), name, schoolType: "College", status: "active", state: "TX",
   locale: null, memberCount: 1, signupDate: null, charterDate: null, term: null, source: "google_sheets",
+  rsoStatus: null, charterStatus: null, staffContact: null, lastEventDate: null, notes: null, link: null,
 });
 
 function sheets(fetchChapters: SourceAdapter["fetchChapters"]): SourceAdapter {

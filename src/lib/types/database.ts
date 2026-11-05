@@ -18,6 +18,12 @@ export type ChapterRow = {
   source: string;
   created_at: string;
   updated_at: string;
+  rso_status: string | null;
+  charter_status: string | null;
+  staff_contact: string | null;
+  last_event_date: string | null;
+  notes: string | null;
+  link: string | null;
 }
 
 export type ChapterSnapshotRow = {

@@ -5,7 +5,7 @@
 // A test (columns.test.ts) fails if a personal-data-looking column is added here.
 export const PUBLIC_COLUMNS = {
   chapters:
-    "id,external_id,name,school_type,status,state,locale,member_count,signup_date,charter_date,term,source,created_at,updated_at",
+    "id,external_id,name,school_type,status,state,locale,member_count,signup_date,charter_date,term,source,created_at,updated_at,rso_status,charter_status,staff_contact,last_event_date,notes,link",
   chapter_snapshots: "id,chapter_external_id,snapshot_date,status,member_count,term,created_at",
   chapter_events:
     "id,external_id,chapter_external_id,event_type,event_date,attendee_count,volunteer_hours,source,created_at",

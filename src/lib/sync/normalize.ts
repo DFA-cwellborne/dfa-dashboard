@@ -56,6 +56,15 @@ export function chapterFromMasterListRow(row: unknown[]): Chapter | null {
     charterDate: null,
     term: null,
     source: "google_sheets",
+    // Columns 3-5 (president name/email/phone) and 7 (membership sheet link)
+    // are PII/internal — deliberately never read here. See the layout
+    // comment in sheetMapping.ts.
+    rsoStatus: toStringOrNull(row[8]),
+    charterStatus: toStringOrNull(row[9]),
+    staffContact: toStringOrNull(row[12]),
+    lastEventDate: toIsoDateOrNull(row[13]),
+    notes: toStringOrNull(row[14]),
+    link: toStringOrNull(row[6]),
   };
 }
 

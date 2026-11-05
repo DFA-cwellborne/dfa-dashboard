@@ -1,5 +1,10 @@
 import { Overview } from "@/components/dashboard/Overview";
+import { PasswordGate } from "@/components/auth/PasswordGate";
 
 export default function OverviewPage() {
-  return <Overview />;
+  return (
+    <PasswordGate>
+      <Overview />
+    </PasswordGate>
+  );
 }

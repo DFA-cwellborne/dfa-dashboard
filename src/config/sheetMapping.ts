@@ -42,10 +42,20 @@ export const RSO_LABEL_MAP: Record<string, "recognized" | "pending" | "notRecogn
  * row per chapter. Row 1 is a merged title, row 2 is the header, row 3 is a
  * "[SCHOOL]" template row (skipped by name), data starts row 4. The range
  * includes the header row since the parser skips row 0, same as the roster.
+ *
+ * Columns (0-indexed, A=0): 0 School/Region, 1 C/H, 2 State, 3 President
+ * Name, 4 President Email, 5 President Phone, 6 Breakthru Community Link,
+ * 7 Membership Sheet, 8 RSO Status, 9 Charter Status, 10 Status, 11 Member
+ * Count, 12 Contact (staff assigned), 13 Last Event Date, 14 Notes.
+ * Columns 3-5 (president PII) and 7 (links to a separate roster sheet that
+ * may itself contain member PII) are intentionally never read — see
+ * chapterFromMasterListRow in normalize.ts. The range covers through column
+ * O (Notes) — extend both this range and that function together if the
+ * sheet grows further columns.
  */
 export const CHAPTER_MASTER_LIST_LAYOUT = {
   sheetName: "Chapter Master List",
-  dataRange: "A2:N220",
+  dataRange: "A2:O220",
 } as const;
 
 export const MASTER_LIST_SCHOOL_TYPE_MAP: Record<string, "HS" | "College"> = {

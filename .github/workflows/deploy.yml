@@ -32,6 +32,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_DASHBOARD_PASSWORD_HASH: ${{ secrets.NEXT_PUBLIC_DASHBOARD_PASSWORD_HASH }}
       # The site is public, so anything in out/ is public. Fail the deploy if a
       # real secret value ended up in it.
       - run: npm run check:bundle

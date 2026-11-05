@@ -133,6 +133,12 @@ async function persistChapters(chapters: Chapter[]) {
     charter_date: c.charterDate,
     term: c.term,
     source: c.source,
+    rso_status: c.rsoStatus,
+    charter_status: c.charterStatus,
+    staff_contact: c.staffContact,
+    last_event_date: c.lastEventDate,
+    notes: c.notes,
+    link: c.link,
   }));
 
   const { error } = await supabase.from("chapters").upsert(rows, { onConflict: "external_id" });

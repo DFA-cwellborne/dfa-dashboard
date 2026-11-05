@@ -26,7 +26,9 @@ import {
 const chapter = (o: Partial<ChapterRow> = {}): ChapterRow => ({
   id: "1", external_id: "c1", name: "C1", school_type: "College", status: "active", state: "TX",
   locale: null, member_count: 10, signup_date: null, charter_date: null, term: null,
-  source: "google_sheets", created_at: "", updated_at: "", ...o,
+  source: "google_sheets", created_at: "", updated_at: "",
+  rso_status: null, charter_status: null, staff_contact: null, last_event_date: null, notes: null, link: null,
+  ...o,
 });
 
 const summary = (o: Partial<SheetSummaryRow> = {}): SheetSummaryRow => ({

@@ -45,6 +45,16 @@ export interface Chapter {
   charterDate: string | null; // ISO date — when the chapter became officially active
   term: string | null; // e.g. "Fall 2026" — used for term-over-term retention
   source: DataSource;
+  /** Free text from the Master List's own "RSO Status"/"Charter Status" columns — per-chapter, unlike the sheet-level SheetSummary aggregate. */
+  rsoStatus: string | null;
+  charterStatus: string | null;
+  /** Staff member assigned to this chapter ("Contact" column) — not the chapter's own president (that's deliberately never synced; see normalize.ts). */
+  staffContact: string | null;
+  lastEventDate: string | null; // ISO date, as hand-maintained on the sheet (distinct from Airtable's logged events)
+  /** Free-text chapter update from the Master List's "Notes" column. */
+  notes: string | null;
+  /** Public Breakthru community link — same category of link already shown on the public map's pins. */
+  link: string | null;
 }
 
 /**
