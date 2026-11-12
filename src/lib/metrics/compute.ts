@@ -1,12 +1,4 @@
-import type {
-  ChapterEventRow,
-  ChapterRow,
-  ChapterSignupRow,
-  ChapterSnapshotRow,
-  PublicMapChapterRow,
-  PublicMapSnapshotRow,
-  SheetSummaryRow,
-} from "@/lib/types/database";
+import type { ChapterEventRow, ChapterRow, ChapterSignupRow, ChapterSnapshotRow, SheetSummaryRow } from "@/lib/types/database";
 
 // ---------------------------------------------------------------------------
 // All aggregation helpers here treat missing data as "excluded", never as
@@ -291,64 +283,3 @@ export function computeSignupsTrend(signups: ChapterSignupRow[]): SignupTrendPoi
   });
 }
 
-export interface Goal {
-  label: string;
-  target: number;
-  /** YYYY-MM-DD */
-  deadline: string;
-}
-
-/** Org's stated growth targets: at least this many chapters active or in the pipeline by each date. */
-export const CHAPTER_GOALS: Goal[] = [
-  { label: "End of 2026", target: 50, deadline: "2026-12-31" },
-  { label: "End of 2027", target: 250, deadline: "2027-12-31" },
-];
-
-export interface GoalProgress extends Goal {
-  current: number;
-  /** 0-1, clamped so a goal already exceeded still renders a full bar. */
-  pct: number;
-  met: boolean;
-  /** Clamped to >= 0 — see deadlinePassed for whether it's actually overdue. */
-  daysRemaining: number;
-  deadlinePassed: boolean;
-}
-
-/**
- * Progress toward each chapter-growth goal, counted as every row in
- * public_map_chapters (the table's own check constraint only allows
- * "active"/"launching", so a plain row count already is "active + pipeline").
- * `today` is passed in rather than read from Date.now() so this stays a pure,
- * easily-tested function.
- */
-export function computeGoalProgress(
-  chapters: PublicMapChapterRow[],
-  today: string,
-  goals: Goal[] = CHAPTER_GOALS
-): GoalProgress[] {
-  const current = chapters.length;
-  const todayMs = new Date(today).getTime();
-  return goals.map((goal) => {
-    const deadlineMs = new Date(goal.deadline).getTime();
-    return {
-      ...goal,
-      current,
-      pct: Math.min(1, current / goal.target),
-      met: current >= goal.target,
-      daysRemaining: Math.max(0, Math.ceil((deadlineMs - todayMs) / (1000 * 60 * 60 * 24))),
-      deadlinePassed: todayMs > deadlineMs,
-    };
-  });
-}
-
-export interface GoalTrendPoint {
-  date: string;
-  value: number;
-}
-
-/** Total (active + launching) chapter count over time, from one daily public_map_snapshots row per day. */
-export function computeGoalTrend(snapshots: PublicMapSnapshotRow[]): GoalTrendPoint[] {
-  return [...snapshots]
-    .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date))
-    .map((s) => ({ date: s.snapshot_date, value: s.active_count + s.launching_count }));
-}

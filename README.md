@@ -34,8 +34,8 @@ different, and the sync layer reflects that:
   (e.g. "Western Albemarle HS" vs "Western Albemarle High School"), so
   merging risks silently duplicating or misassigning chapters. It's richer
   and more current than the Master List (real coordinates, more chapters)
-  and is the only source for the Map view and the Goals feature — the rest
-  of the dashboard (member counts, RSO status, etc.) is untouched by it.
+  and is the only source for the Map view — the rest of the dashboard
+  (member counts, RSO status, etc.) is untouched by it.
   See `src/lib/sync/publicMapAdapter.ts` / `publicMapSync.ts` and the
   `public_map_chapters` / `public_map_snapshots` tables (migration `0005`).
 

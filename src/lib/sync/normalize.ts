@@ -35,6 +35,29 @@ function mapEnum<T extends string>(v: unknown, map: Record<string, T>): T | null
   return map[s.toLowerCase()] ?? null;
 }
 
+const EMAIL_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+const EMAIL_RE_GLOBAL = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
+
+/**
+ * "Contact" is meant to hold a staff member's name, but has been observed
+ * in practice to sometimes hold their work email instead — drop it rather
+ * than let a real address flow into the public anon-key-readable table
+ * (same bar as the president name/email/phone columns, which are never
+ * read at all for this reason).
+ */
+function toStaffContactOrNull(v: unknown): string | null {
+  const s = toStringOrNull(v);
+  if (!s) return null;
+  return EMAIL_RE.test(s) ? null : s;
+}
+
+/** Scrubs any embedded email address out of free text before it's ever synced — notes are meant for status updates, not contact info. */
+function redactEmails(v: unknown): string | null {
+  const s = toStringOrNull(v);
+  if (!s) return null;
+  return s.replace(EMAIL_RE_GLOBAL, "[redacted]");
+}
+
 /**
  * Turns one "Chapter Master List" row (School/Region, C/H, State, ...,
  * RSO Status, Charter Status, Status, Member Count, ...) into a Chapter.
@@ -61,9 +84,9 @@ export function chapterFromMasterListRow(row: unknown[]): Chapter | null {
     // comment in sheetMapping.ts.
     rsoStatus: toStringOrNull(row[8]),
     charterStatus: toStringOrNull(row[9]),
-    staffContact: toStringOrNull(row[12]),
+    staffContact: toStaffContactOrNull(row[12]),
     lastEventDate: toIsoDateOrNull(row[13]),
-    notes: toStringOrNull(row[14]),
+    notes: redactEmails(row[14]),
     link: toStringOrNull(row[6]),
   };
 }

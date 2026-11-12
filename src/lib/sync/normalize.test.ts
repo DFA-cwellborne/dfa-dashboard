@@ -95,6 +95,28 @@ describe("chapterFromMasterListRow", () => {
     expect(values).not.toContain("(555) 555-0100");
     expect(values).not.toContain("https://sheets.google.com/secret-roster");
   });
+
+  it("drops staff_contact entirely if someone put an email there instead of a name — observed in real sheet data", () => {
+    const c = chapterFromMasterListRow(masterRow({ 12: "owebster@dreamforamerica.org" }))!;
+    expect(c.staffContact).toBeNull();
+  });
+
+  it("keeps a real staff name in staff_contact", () => {
+    const c = chapterFromMasterListRow(masterRow({ 12: "Clayton Wellborne" }))!;
+    expect(c.staffContact).toBe("Clayton Wellborne");
+  });
+
+  it("redacts an email embedded in notes rather than leaking it, without dropping the rest of the note", () => {
+    const c = chapterFromMasterListRow(
+      masterRow({ 14: "President unresponsive, try president@example.edu instead" })
+    )!;
+    expect(c.notes).toBe("President unresponsive, try [redacted] instead");
+  });
+
+  it("redacts every email if a note has more than one", () => {
+    const c = chapterFromMasterListRow(masterRow({ 14: "cc both a@x.com and b@y.com" }))!;
+    expect(c.notes).toBe("cc both [redacted] and [redacted]");
+  });
 });
 
 describe("normalizeSignupRow", () => {
