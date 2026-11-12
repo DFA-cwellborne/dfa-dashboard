@@ -2,14 +2,17 @@
 
 import { useSyncExternalStore } from "react";
 import { clsx } from "clsx";
-import { ChartColumn, MapPinned } from "lucide-react";
+import { ChartColumn, MapPinned, DollarSign } from "lucide-react";
 
-export type View = "stats" | "map";
+export type View = "stats" | "map" | "finance";
 
 const VIEWS: { id: View; label: string; Icon: typeof MapPinned }[] = [
   { id: "stats", label: "Stats", Icon: ChartColumn },
   { id: "map", label: "Map", Icon: MapPinned },
+  { id: "finance", label: "Finance", Icon: DollarSign },
 ];
+
+const HASH_TO_VIEW: Record<string, View> = { "#map": "map", "#finance": "finance" };
 
 // The current view lives in the URL hash (#map), so a refresh stays on the same
 // view and a link can point straight at the map — without needing a second
@@ -18,13 +21,13 @@ function subscribe(onChange: () => void) {
   window.addEventListener("hashchange", onChange);
   return () => window.removeEventListener("hashchange", onChange);
 }
-const getSnapshot = (): View => (window.location.hash === "#map" ? "map" : "stats");
+const getSnapshot = (): View => HASH_TO_VIEW[window.location.hash] ?? "stats";
 const getServerSnapshot = (): View => "stats";
 
 export function useView(): [View, (view: View) => void] {
   const view = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const setView = (next: View) => {
-    window.location.hash = next;
+    window.location.hash = next === "stats" ? "" : next;
     window.scrollTo?.(0, 0);
   };
   return [view, setView];
@@ -49,11 +52,12 @@ export function ViewSwitcher({ view, onChange }: { view: View; onChange: (view: 
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(id)}
             onKeyDown={(e) => {
-              if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-                const other = VIEWS.find((v) => v.id !== id)!;
-                onChange(other.id);
-                requestAnimationFrame(() => document.getElementById(`tab-${other.id}`)?.focus());
-              }
+              if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+              const i = VIEWS.findIndex((v) => v.id === id);
+              const delta = e.key === "ArrowRight" ? 1 : -1;
+              const next = VIEWS[(i + delta + VIEWS.length) % VIEWS.length];
+              onChange(next.id);
+              requestAnimationFrame(() => document.getElementById(`tab-${next.id}`)?.focus());
             }}
             className={clsx(
               "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-blue",

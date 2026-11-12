@@ -214,21 +214,6 @@ export function computeRetention(snapshots: ChapterSnapshotRow[]): RetentionStat
   };
 }
 
-export interface TimeToCharterStats {
-  avgDays: number | null;
-  chaptersReporting: number;
-}
-
-export function computeTimeToCharter(chapters: ChapterRow[]): TimeToCharterStats {
-  const withBothDates = chapters.filter((c) => c.signup_date && c.charter_date);
-  const days = withBothDates.map((c) => {
-    const signup = new Date(c.signup_date!).getTime();
-    const charter = new Date(c.charter_date!).getTime();
-    return (charter - signup) / (1000 * 60 * 60 * 24);
-  });
-  return { avgDays: avgExcludingNulls(days), chaptersReporting: withBothDates.length };
-}
-
 export interface TrendPoint {
   date: string;
   chapters: number;
@@ -281,5 +266,43 @@ export function computeSignupsTrend(signups: ChapterSignupRow[]): SignupTrendPoi
     cumulative += count;
     return { date, count, cumulative };
   });
+}
+
+export interface FinanceProjection {
+  totalRaised: number;
+  currentActiveChapters: number;
+  /** null rather than Infinity/NaN if there are currently no active chapters to divide by. */
+  costPerChapterNow: number | null;
+  scaleTargetChapters: number;
+  costPerChapterAtScale: number;
+  /** Today's events-per-chapter rate, scaled up to scaleTargetChapters — a volume projection, not a dollar one. */
+  projectedEventsAtScale: number;
+}
+
+/**
+ * Illustrative-only program-cost figures for the Finance view — not real
+ * program accounting. `totalRaised` is the org's one real, cited anchor
+ * (lifetime fundraising since founding); dividing it by a chapter count
+ * conflates multi-year fundraising with a point-in-time chapter count, so
+ * this is explicitly a placeholder pending real budget figures, not a
+ * claimed-accurate cost figure. See src/data/orgFinance.ts for the source.
+ */
+export function computeFinanceProjection(
+  currentActiveChapters: number,
+  totalRaised: number,
+  scaleTargetChapters: number,
+  eventsPerChapterBasis: { events: number; chapters: number }
+): FinanceProjection {
+  return {
+    totalRaised,
+    currentActiveChapters,
+    costPerChapterNow: currentActiveChapters > 0 ? totalRaised / currentActiveChapters : null,
+    scaleTargetChapters,
+    costPerChapterAtScale: totalRaised / scaleTargetChapters,
+    projectedEventsAtScale:
+      eventsPerChapterBasis.chapters > 0
+        ? Math.round((eventsPerChapterBasis.events / eventsPerChapterBasis.chapters) * scaleTargetChapters)
+        : 0,
+  };
 }
 

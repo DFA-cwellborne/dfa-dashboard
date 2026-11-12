@@ -141,7 +141,7 @@ export function ChapterMap({ chapters, info }: { chapters: PublicMapChapterRow[]
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-navy/50">
+        <h2 className="flex items-center gap-1.5 text-base font-semibold text-navy">
           Chapter Map
           <InfoTooltip text={info} />
         </h2>

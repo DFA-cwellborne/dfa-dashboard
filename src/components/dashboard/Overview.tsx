@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Users, Building2, CalendarCheck, TrendingUp, Clock, UserPlus } from "lucide-react";
+import { Users, Building2, CalendarCheck, TrendingUp, UserPlus, ClipboardCheck, Rocket, Hammer } from "lucide-react";
+import { ORG_ESTIMATES } from "@/data/orgEstimates";
+import { ORG_FINANCE } from "@/data/orgFinance";
 import { TopBar } from "@/components/layout/TopBar";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card } from "@/components/ui/Card";
@@ -13,6 +15,7 @@ import { RangeTrendChart } from "@/components/charts/RangeTrendChart";
 import { EventTypeBarChart } from "@/components/charts/EventTypeBarChart";
 import { ChaptersTable } from "@/components/chapters/ChaptersTable";
 import { ChapterMap } from "@/components/map/ChapterMap";
+import { Finance } from "@/components/dashboard/Finance";
 import { ViewSwitcher, useView } from "@/components/layout/ViewSwitcher";
 import { localToday } from "@/lib/format/date";
 import { AdminSyncPanel } from "@/components/admin/AdminSyncPanel";
@@ -20,13 +23,13 @@ import { getDashboardData, getSyncLogSummary, type DashboardData, type SyncLogSu
 import {
   computeChapterCounts,
   computeEventBreakdown,
+  computeFinanceProjection,
   computeMembershipStats,
   computeRetention,
   computeRsoBreakdown,
   computeSignupsTrend,
   computeStatusBreakdown,
   countRecentSignups,
-  computeTimeToCharter,
   computeTrendSeries,
 } from "@/lib/metrics/compute";
 
@@ -64,8 +67,6 @@ const METRIC_INFO = {
     "Daily count of Airtable intake submissions that asked to start or join a chapter, with a running cumulative total.",
   retention:
     "Share of chapters active last term that are still active this term. Needs two or more terms of snapshot history — no source currently reports a term, so this stays “No data.”",
-  timeToCharter:
-    "Average days between a chapter's signup date and its charter date. Not yet wired up — would need a signup-date source (e.g. Calendly) plus Airtable's charter date.",
   newSignups: "“Start a chapter” submissions from the last 30 days.",
   eventBreakdown: "Events by the type chosen on the Airtable event planning form, most common first.",
   chaptersTable:
@@ -173,11 +174,17 @@ export function Overview() {
   const rsoBreakdown = computeRsoBreakdown(data.summary);
   const eventBreakdown = computeEventBreakdown(data.events, localToday());
   const retention = computeRetention(data.snapshots);
-  const timeToCharter = computeTimeToCharter(data.chapters);
   const trend = computeTrendSeries(data.snapshots);
   const signupsTrend = computeSignupsTrend(data.signups);
 
   const newSignupsLast30Days = countRecentSignups(data.signups, 30);
+  const currentActiveChapters = data.publicMapChapters.filter((c) => c.status === "active").length;
+  const financeProjection = computeFinanceProjection(
+    currentActiveChapters,
+    ORG_FINANCE.totalRaisedSinceFounding,
+    ORG_FINANCE.scaleTargetChapters,
+    { events: ORG_FINANCE.eventsHostedSpring2026, chapters: ORG_FINANCE.activeChaptersSpring2026 }
+  );
 
   return (
     <>
@@ -202,6 +209,8 @@ export function Overview() {
       >
         {view === "map" ? (
           <ChapterMap chapters={data.publicMapChapters} info={METRIC_INFO.chapterMap} />
+        ) : view === "finance" ? (
+          <Finance projection={financeProjection} />
         ) : (
           <>
             <p className="max-w-3xl text-sm text-navy/60">
@@ -250,7 +259,7 @@ export function Overview() {
             </section>
 
             <section>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+              <h2 className="mb-4 border-b-2 border-navy/10 pb-2 text-base font-semibold text-navy">
                 Chapter &amp; RSO Status
               </h2>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -302,7 +311,7 @@ export function Overview() {
             </section>
 
             <section>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+              <h2 className="mb-4 border-b-2 border-navy/10 pb-2 text-base font-semibold text-navy">
                 Growth Over Time
               </h2>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -324,7 +333,7 @@ export function Overview() {
             </section>
 
             <section>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+              <h2 className="mb-4 border-b-2 border-navy/10 pb-2 text-base font-semibold text-navy">
                 Chapter Signups
               </h2>
               <Card>
@@ -337,10 +346,10 @@ export function Overview() {
             </section>
 
             <section>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-navy/50">
+              <h2 className="mb-4 border-b-2 border-navy/10 pb-2 text-base font-semibold text-navy">
                 Program Health
               </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <StatCard
                   label="Chapter Retention"
                   info={METRIC_INFO.retention}
@@ -353,18 +362,39 @@ export function Overview() {
                   icon={<TrendingUp size={18} />}
                 />
                 <StatCard
-                  label="Avg. Time to Charter"
-                  info={METRIC_INFO.timeToCharter}
-                  value={timeToCharter.avgDays !== null ? `${timeToCharter.avgDays.toFixed(0)}d` : "No data"}
-                  sublabel={`${timeToCharter.chaptersReporting} chapters with both dates`}
-                  icon={<Clock size={18} />}
-                />
-                <StatCard
                   label="New Signups (30d)"
                   info={METRIC_INFO.newSignups}
                   value={newSignupsLast30Days.toLocaleString()}
                   sublabel="From the start-a-chapter form"
                   icon={<UserPlus size={18} />}
+                />
+                <StatCard
+                  label="Typical Meeting Attendance"
+                  info="An org estimate, not computed from logged data — real event headcounts aren't being captured consistently yet."
+                  value={ORG_ESTIMATES.typicalMeetingAttendance}
+                  sublabel="Estimate, as of Nov 2026"
+                  icon={<Users size={18} />}
+                />
+                <StatCard
+                  label="Interest Form → Charter"
+                  info="An org estimate, not computed from logged data — there's no real signup-date or charter-date source wired up yet."
+                  value={`~${ORG_ESTIMATES.interestToCharterDays}d`}
+                  sublabel="Estimate, as of Nov 2026"
+                  icon={<ClipboardCheck size={18} />}
+                />
+                <StatCard
+                  label="Charter → First Event"
+                  info="An org estimate, not computed from logged data — there's no real charter-date source wired up yet."
+                  value={`~${ORG_ESTIMATES.charterToFirstEventDays}d`}
+                  sublabel="Estimate, as of Nov 2026"
+                  icon={<Rocket size={18} />}
+                />
+                <StatCard
+                  label="Starter Kit Tracking"
+                  info="Per-chapter starter-kit distribution isn't tracked anywhere yet — this is a placeholder for a metric that's planned, not live."
+                  value="Coming soon"
+                  sublabel="In progress"
+                  icon={<Hammer size={18} />}
                 />
               </div>
             </section>
@@ -378,7 +408,7 @@ export function Overview() {
             </Card>
 
             <section>
-              <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-navy/50">
+              <h2 className="mb-4 flex items-center gap-1.5 border-b-2 border-navy/10 pb-2 text-base font-semibold text-navy">
                 Chapters
                 <InfoTooltip text={METRIC_INFO.chaptersTable} />
               </h2>

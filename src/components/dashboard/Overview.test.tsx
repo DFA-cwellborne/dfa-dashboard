@@ -83,6 +83,17 @@ describe("Overview", () => {
       expect(window.location.hash).toBe("#map");
     });
 
+    it("switches to finance and hides the stats", async () => {
+      render(<Overview />);
+      await screen.findByText("Active Chapters");
+      fireEvent.click(tab("Finance"));
+
+      expect(await screen.findByText(/Illustrative, not audited/)).toBeTruthy();
+      expect(screen.queryByText("Active Chapters")).toBeNull();
+      expect(tab("Finance").getAttribute("aria-selected")).toBe("true");
+      expect(window.location.hash).toBe("#finance");
+    });
+
     it("switches back to the stats", async () => {
       render(<Overview />);
       await screen.findByText("Active Chapters");

@@ -9,12 +9,12 @@ import type {
 import {
   computeChapterCounts,
   computeEventBreakdown,
+  computeFinanceProjection,
   computeMembershipStats,
   computeRetention,
   computeRsoBreakdown,
   computeSignupsTrend,
   computeStatusBreakdown,
-  computeTimeToCharter,
   computeTrendSeries,
   countRecentSignups,
 } from "./compute";
@@ -205,22 +205,6 @@ describe("computeRetention", () => {
   });
 });
 
-describe("computeTimeToCharter", () => {
-  it("averages only chapters with both dates", () => {
-    const t = computeTimeToCharter([
-      chapter({ signup_date: "2026-01-01", charter_date: "2026-01-11" }),
-      chapter({ signup_date: "2026-01-01", charter_date: "2026-01-21" }),
-      chapter({ signup_date: "2026-01-01", charter_date: null }),
-      chapter({ signup_date: null, charter_date: "2026-03-01" }),
-    ]);
-    expect(t).toEqual({ avgDays: 15, chaptersReporting: 2 });
-  });
-
-  it("is null when no chapter has both dates", () => {
-    expect(computeTimeToCharter([chapter()])).toEqual({ avgDays: null, chaptersReporting: 0 });
-  });
-});
-
 describe("computeEventBreakdown", () => {
   const event = (event_type: ChapterEventRow["event_type"], event_date: string | null = "2026-09-10"): ChapterEventRow => ({
     id: "e", external_id: "e", chapter_external_id: "c1", event_type, event_date,
@@ -260,6 +244,34 @@ describe("computeEventBreakdown", () => {
 
   it("is empty with no events", () => {
     expect(computeEventBreakdown([], TODAY)).toEqual({ total: 0, held: 0, upcoming: 0, undated: 0, byType: [] });
+  });
+});
+
+describe("computeFinanceProjection", () => {
+  it("divides total raised by the current active chapter count", () => {
+    const p = computeFinanceProjection(50, 500_000, 50, { events: 150, chapters: 43 });
+    expect(p.costPerChapterNow).toBe(10_000);
+  });
+
+  it("returns null (not Infinity/NaN) for costPerChapterNow when there are zero active chapters", () => {
+    const p = computeFinanceProjection(0, 500_000, 50, { events: 150, chapters: 43 });
+    expect(p.costPerChapterNow).toBeNull();
+  });
+
+  it("computes the at-scale cost using scaleTargetChapters regardless of the current count", () => {
+    const p = computeFinanceProjection(20, 500_000, 50, { events: 150, chapters: 43 });
+    expect(p.costPerChapterAtScale).toBe(10_000);
+  });
+
+  it("scales the events-per-chapter rate up to the target chapter count", () => {
+    const p = computeFinanceProjection(43, 500_000, 50, { events: 150, chapters: 43 });
+    // 150/43 chapters * 50 chapters = 174.4 -> rounds to 174
+    expect(p.projectedEventsAtScale).toBe(174);
+  });
+
+  it("returns 0 projected events rather than dividing by zero when the basis has no chapters", () => {
+    const p = computeFinanceProjection(43, 500_000, 50, { events: 150, chapters: 0 });
+    expect(p.projectedEventsAtScale).toBe(0);
   });
 });
 
